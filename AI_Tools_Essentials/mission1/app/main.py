@@ -117,8 +117,43 @@ CHAT_SYSTEM_PROMPT_TEMPLATE = (
     "5) 질문의 전제가 모호하면 임의로 단정하지 말고 한 번 되물어 확인합니다.\n\n"
     "<공고 컨텍스트>\n"
     "{context}\n"
-    "</공고 컨텍스트>\n"
+    "</공고 컨텍스트>\n\n"
+    "[예시 안내] 이어지는 처음 3개의 문답(Q/A)은 '좋은 답변 형식·태도'를 보여주기 위한 "
+    "가상의 예시이며 위 <공고 컨텍스트>와 무관합니다. 예시 속 사실(장소·금액·날짜 등)은 "
+    "절대 인용하지 말고 형식·태도만 따르세요. 그 이후의 사용자 질문부터가 실제 대화이며, "
+    "실제 답변은 반드시 <공고 컨텍스트>에만 근거합니다.\n"
 )
+
+# Few-shot 예시 (시스템 설계 문서 §8) — "좋은 입력 → 좋은 출력".
+# system 다음·실제 대화 앞에 user/assistant 턴으로 주입해 응답 형식과
+# '모호한 입력 → 되묻기' 패턴을 시연한다. (아래 값은 형식 예시이며 실제 공고 사실이 아님)
+CHAT_FEWSHOT = [
+    # 8-1. 예시 1 (일반 — 일정/장소)
+    {"role": "user", "content": "언제 어디서 열려?"},
+    {
+        "role": "assistant",
+        "content": "일정: 2026-08-15 ~ 08-16 (원문 표기)\n장소: 서울 코엑스 D홀",
+    },
+    # 8-2. 예시 2 (일반 — 참여조건/상금)
+    {"role": "user", "content": "비전공자도 참가 가능해? 상금은?"},
+    {
+        "role": "assistant",
+        "content": (
+            "참여 대상: 전공 무관, 만 19세 이상 누구나 (원문: \"전공·연령 제한 없음\")\n"
+            "상금: 대상 1팀 500만원, 최우수 2팀 각 200만원"
+        ),
+    },
+    # 8-3. 예시 3 (모호한 입력 → 되묻기)
+    {"role": "user", "content": "이거 신청하면 돼?"},
+    {
+        "role": "assistant",
+        "content": (
+            "질문을 조금 좁혀 주세요. 어떤 것을 확인해 드릴까요?\n"
+            "① 신청 자격 충족 여부  ② 신청 방법/링크  ③ 접수 마감일\n"
+            "(참고로 접수 마감은 공고상 2026-08-01 18:00입니다.)"
+        ),
+    },
+]
 
 
 # ---------------------------------------------------------------------------
@@ -339,6 +374,7 @@ def analyze(req: AnalyzeRequest):
 def chat(req: ChatRequest):
     system_prompt = CHAT_SYSTEM_PROMPT_TEMPLATE.format(context=req.context)
     messages = [{"role": "system", "content": system_prompt}]
+    messages.extend(CHAT_FEWSHOT)  # Few-shot 예시 주입 (시스템 설계 §8)
     for m in req.messages:
         messages.append({"role": m.role, "content": m.content})
     try:
