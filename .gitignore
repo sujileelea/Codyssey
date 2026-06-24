@@ -1,4 +1,60 @@
+# ===== OS / 기타 =====
 *.DS_Store*
 *outline*
+
+# ===== Python =====
 __pycache__/
 *.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# ===== 환경변수 / 시크릿 (민감) =====
+.env
+.env.*
+*.env
+# 단, 키 없는 템플릿은 커밋 허용
+!.env.example
+!.env.sample
+!.env.template
+
+# ===== 인증서 / 키 =====
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+*.p12
+*.pfx
+*.keystore
+*.jks
+*.kdbx
+
+# ===== SSH / GPG 키 =====
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+*.ppk
+*.pgp
+*.gpg
+*.asc
+
+# ===== 자격증명 / 토큰 =====
+*secret*
+*secrets*
+*credential*
+*credentials*
+*.token
+*.tokens
+token.json
+tokens.json
+*apikey*
+*api_key*
+*service-account*.json
+*serviceaccount*.json
+.aws/
+gcp-*.json
+.npmrc
+.pypirc

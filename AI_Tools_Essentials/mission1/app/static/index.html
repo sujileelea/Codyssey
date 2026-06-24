@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>공고 분석 챗봇</title>
+<title>공고 분석 챗봇 — 모델 비교</title>
 <style>
   :root {
     --bg: #0f1115;
@@ -16,6 +16,9 @@
     --accent-2: #3f6fe0;
     --ok: #43c59e;
     --warn: #f0a04b;
+    --m1: #5b8cff;
+    --m2: #43c59e;
+    --m3: #c98bff;
   }
   * { box-sizing: border-box; }
   body {
@@ -28,7 +31,6 @@
   }
   header h1 { font-size: 16px; margin: 0; font-weight: 650; }
   header .sub { color: var(--muted); font-size: 12px; }
-  .topbar { margin-left: auto; display: flex; gap: 10px; align-items: center; }
   select, input, button { font-family: inherit; font-size: 13px; }
   select {
     background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
@@ -36,11 +38,13 @@
   }
   .layout { display: grid; grid-template-columns: 380px 1fr; height: calc(100vh - 53px); }
   .left { border-right: 1px solid var(--line); overflow-y: auto; padding: 16px; background: var(--panel); }
-  .url-row { display: flex; gap: 8px; margin-bottom: 14px; }
+  .left label.lbl { display:block; font-size: 11px; color: var(--muted); margin: 0 0 6px; }
+  .url-row { display: flex; gap: 8px; margin-bottom: 10px; }
   .url-row input {
     flex: 1; background: var(--panel-2); color: var(--text);
     border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
   }
+  .analyze-model { width: 100%; margin-bottom: 12px; }
   button.primary {
     background: var(--accent); color: white; border: none; border-radius: 8px;
     padding: 10px 14px; cursor: pointer; font-weight: 600; white-space: nowrap;
@@ -49,32 +53,50 @@
   button.primary:disabled { opacity: .5; cursor: not-allowed; }
   .poster { width: 100%; border-radius: 10px; border: 1px solid var(--line); margin-bottom: 14px; display: none; }
   .fields { display: flex; flex-direction: column; gap: 8px; }
-  .field {
-    background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
-  }
-  .field .k { font-size: 11px; color: var(--muted); margin-bottom: 3px; letter-spacing: .02em; }
+  .field { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  .field .k { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
   .field .v { font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
   .field.empty .v { color: var(--warn); }
   .hint { color: var(--muted); font-size: 12px; line-height: 1.6; }
 
-  .right { display: flex; flex-direction: column; height: 100%; }
+  .right { display: flex; flex-direction: column; height: 100%; min-width: 0; }
+  /* 모델 토글 바 */
+  .modelbar { display: flex; gap: 8px; align-items: center; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+  .toggle { display:flex; gap:6px; background: var(--panel-2); border:1px solid var(--line); border-radius: 10px; padding: 4px; }
+  .toggle button {
+    border: none; background: transparent; color: var(--muted); padding: 7px 13px;
+    border-radius: 7px; cursor: pointer; font-weight: 600; font-size: 13px; display:flex; align-items:center; gap:7px;
+  }
+  .toggle button .dot { width:8px; height:8px; border-radius:50%; }
+  .toggle button[data-k="model1"] .dot { background: var(--m1); }
+  .toggle button[data-k="model2"] .dot { background: var(--m2); }
+  .toggle button[data-k="model3"] .dot { background: var(--m3); }
+  .toggle button.active { background: var(--bg); color: var(--text); }
+  .toggle button .cnt { font-size: 11px; color: var(--muted); }
+  .bcast { margin-left: auto; display:flex; align-items:center; gap:7px; color: var(--muted); font-size: 12px; cursor: pointer; user-select:none; }
+  .bcast input { width:15px; height:15px; }
+
   .chat { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
-  .msg { max-width: 78%; padding: 11px 14px; border-radius: 12px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+  .msg { max-width: 80%; padding: 11px 14px; border-radius: 12px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
   .msg.user { align-self: flex-end; background: var(--accent-2); color: #fff; border-bottom-right-radius: 4px; }
   .msg.bot { align-self: flex-start; background: var(--panel-2); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
-  .msg.system { align-self: center; color: var(--muted); font-size: 12px; background: transparent; }
+  .msg.bot .who { font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
+  .msg.system { align-self: center; color: var(--muted); font-size: 12px; background: transparent; text-align:center; }
+  .botrow { display: flex; align-items: flex-end; gap: 8px; align-self: flex-start; max-width: 88%; }
+  .botrow .msg.bot { max-width: 100%; align-self: auto; }
+  .latency { font-size: 11px; color: var(--muted); white-space: nowrap; padding-bottom: 6px; }
   .composer { border-top: 1px solid var(--line); padding: 14px 20px; display: flex; gap: 10px; background: var(--panel); }
   .composer input {
     flex: 1; background: var(--panel-2); color: var(--text);
     border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 14px;
   }
   .composer input:disabled { opacity: .5; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-  .chip {
-    background: var(--panel-2); border: 1px solid var(--line); color: var(--muted);
-    border-radius: 999px; padding: 6px 11px; font-size: 12px; cursor: pointer;
-  }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 20px 10px; max-height: 176px; overflow-y: auto; }
+  .chip { background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); border-radius: 999px; padding: 6px 11px; font-size: 12px; cursor: pointer; }
   .chip:hover { color: var(--text); border-color: var(--accent); }
+  .chips-cap { flex-basis: 100%; color: var(--muted); font-size: 11px; margin: 0 0 2px; line-height: 1.5; }
+  .chip.star { border-color: var(--accent); color: var(--text); }
+  .chip.edit { border-style: dashed; border-color: var(--warn); }
   .spinner { display:inline-block; width:14px; height:14px; border:2px solid var(--muted); border-top-color:transparent; border-radius:50%; animation:spin .7s linear infinite; vertical-align:middle;}
   @keyframes spin { to { transform: rotate(360deg);} }
 </style>
@@ -82,40 +104,52 @@
 <body>
 <header>
   <h1>📋 공고 분석 챗봇</h1>
-  <span class="sub">공고 링크 → 포스터·문안 분석 → 문답</span>
-  <div class="topbar">
-    <label class="sub">모델</label>
-    <select id="modelSelect"></select>
-  </div>
+  <span class="sub">공고 링크 → 포스터·문안 분석 → 3개 모델 비교 문답</span>
 </header>
 
 <div class="layout">
   <div class="left">
+    <label class="lbl">공고 URL</label>
     <div class="url-row">
-      <input id="urlInput" type="url" placeholder="공고 URL을 붙여넣으세요 (https://...)" />
+      <input id="urlInput" type="url" placeholder="https://... 공고 링크" />
       <button class="primary" id="analyzeBtn">분석</button>
     </div>
+    <label class="lbl">분석(추출)에 사용할 모델</label>
+    <select id="analyzeModel" class="analyze-model"></select>
+
     <img id="poster" class="poster" alt="공고 포스터" />
     <div id="fields" class="fields"></div>
     <div id="leftHint" class="hint">
-      공고 URL을 입력하고 <b>분석</b>을 누르면, 포스터와 핵심 정보(제목·장소·날짜·참여조건·상금·주관기관 등)를 추출합니다.
-      이후 오른쪽 챗봇에서 자유롭게 질문하세요.
+      공고 URL을 입력하고 <b>분석</b>을 누르면 포스터와 핵심 정보를 추출합니다.
+      이후 오른쪽 상단에서 <b>모델을 토글</b>해 같은 공고에 대해 모델별 답변을 비교하세요.
+      각 모델의 대화 내역은 따로 보존됩니다.
     </div>
   </div>
 
   <div class="right">
+    <div class="modelbar">
+      <div class="toggle" id="toggle"></div>
+      <label class="bcast"><input type="checkbox" id="bcast" /> 모든 모델에 동시 질문</label>
+    </div>
+
     <div class="chat" id="chat">
       <div class="msg system">분석된 공고가 아직 없습니다. 왼쪽에서 먼저 공고를 분석해 주세요.</div>
     </div>
-    <div style="padding:0 20px;">
-      <div class="chips" id="chips" style="display:none;">
-        <span class="chip">제목이 뭐야?</span>
-        <span class="chip">언제, 어디서 열려?</span>
-        <span class="chip">참여 조건이 어떻게 돼?</span>
-        <span class="chip">상금은 얼마야?</span>
-        <span class="chip">주관기관은 어디야?</span>
-        <span class="chip">접수 마감일은?</span>
-      </div>
+
+    <div class="chips" id="chips" style="display:none;">
+      <span class="chips-cap">빠른 질문 — 순서대로 누르면 바로 전송됩니다. <b>✎</b> = 보내기 전 직접 수정 가능, <b>★</b> = 핵심 산출물(요약본).</span>
+      <span class="chip" data-q="이 공고 제목과 주관기관은?">1. 제목·주관기관</span>
+      <span class="chip" data-q="행사 일정과 장소는? (원문 표기로)">2. 일정·장소(원문 표기)</span>
+      <span class="chip" data-q="참여 대상/조건은? 비전공자도 가능한가?">3. 참여 대상·조건</span>
+      <span class="chip" data-q="상 종류랑 상금이 어떻게 돼?">4. 상 종류·상금</span>
+      <span class="chip" data-q="제출 서류는 뭐뭐 있어?">5. 제출 서류</span>
+      <span class="chip" data-q="접수 마감일은 언제인가?">6. 접수 마감일</span>
+      <span class="chip" data-q="마감까지 며칠 남았어?">7. 마감까지 며칠? (계산 함정)</span>
+      <span class="chip edit" data-q="행사장에 주차 공간이 있나요?">8. 원문에 없는 질문 ✎ (환각 함정)</span>
+      <span class="chip" data-q="이거 신청하면 돼?">9. 이거 신청하면 돼? (모호)</span>
+      <span class="chip star" data-q="사내 공유용으로 전달할 요약본을 출력해줘.">10. 사내 공유 요약본 ★</span>
+      <span class="chip edit" data-q="참고로 우리팀은 3명이고, 팀원은 a, b, c야. 문제 없어?">11. 팀 정보 전달 ✎</span>
+      <span class="chip star" data-q="아까 출력한 사내 공유용 요약본에 팀 정보도 추가해서 출력해줘.">12. 요약본 + 팀 정보 ★</span>
     </div>
     <div class="composer">
       <input id="chatInput" type="text" placeholder="공고에 대해 질문하세요…" disabled />
@@ -127,111 +161,160 @@
 <script>
 const $ = (id) => document.getElementById(id);
 let CONTEXT = null;
-let HISTORY = [];   // {role, content}
+let MODELS = [];                 // [{key,label}]
+let ACTIVE = null;               // 현재 토글된 모델 key
+const HISTORIES = {};            // { model1:[{role,content}], ... }  모델별 대화 내역
 
 async function loadModels() {
   try {
-    const r = await fetch('/api/models');
-    const d = await r.json();
-    $('modelSelect').innerHTML = d.models
-      .map(m => `<option value="${m.key}" ${m.key===d.default?'selected':''}>${m.label}</option>`)
-      .join('');
+    const d = await (await fetch('/api/models')).json();
+    MODELS = d.models;
+    ACTIVE = d.default;
   } catch (e) {
-    $('modelSelect').innerHTML = '<option>모델 정보를 불러오지 못함</option>';
+    MODELS = [{key:'model1',label:'모델1'}]; ACTIVE='model1';
   }
+  MODELS.forEach(m => { if (!HISTORIES[m.key]) HISTORIES[m.key] = []; });
+  // 분석 모델 드롭다운
+  $('analyzeModel').innerHTML = MODELS
+    .map(m => `<option value="${m.key}" ${m.key===ACTIVE?'selected':''}>${m.label}</option>`).join('');
+  renderToggle();
+}
+
+function renderToggle() {
+  $('toggle').innerHTML = MODELS.map(m => {
+    return `<button data-k="${m.key}" class="${m.key===ACTIVE?'active':''}">
+      <span class="dot"></span>${m.label}</button>`;
+  }).join('');
 }
 
 function renderFields(fields) {
-  const box = $('fields');
-  box.innerHTML = '';
+  const box = $('fields'); box.innerHTML = '';
   if (!fields || fields._parse_error) {
-    box.innerHTML = `<div class="field empty"><div class="k">파싱 오류</div><div class="v">모델이 JSON을 반환하지 못했습니다. 원문:\n${(fields&&fields._raw)||''}</div></div>`;
+    box.innerHTML = `<div class="field empty"><div class="k">파싱 오류</div><div class="v">모델이 JSON을 반환하지 못했습니다.\n${(fields&&fields._raw)||''}</div></div>`;
     return;
   }
-  Object.entries(fields).forEach(([k, v]) => {
+  Object.entries(fields).forEach(([k,v]) => {
     if (k.startsWith('_')) return;
-    const empty = (v === '정보 없음' || v === '' || v == null);
+    const empty = (v==='정보 없음'||v===''||v==null);
     const el = document.createElement('div');
-    el.className = 'field' + (empty ? ' empty' : '');
-    el.innerHTML = `<div class="k">${k}</div><div class="v">${(v==null?'':v)}</div>`;
+    el.className = 'field' + (empty?' empty':'');
+    el.innerHTML = `<div class="k">${k}</div><div class="v">${v==null?'':v}</div>`;
     box.appendChild(el);
   });
 }
 
-function addMsg(role, text) {
-  const el = document.createElement('div');
-  el.className = 'msg ' + role;
-  el.textContent = text;
-  $('chat').appendChild(el);
-  $('chat').scrollTop = $('chat').scrollHeight;
-  return el;
+function labelOf(key){ const m = MODELS.find(x=>x.key===key); return m?m.label:key; }
+function fmtMs(ms){ return ms < 1000 ? Math.round(ms)+'ms' : (ms/1000).toFixed(1)+'s'; }
+
+// 현재 ACTIVE 모델의 대화 내역을 화면에 렌더
+function renderChat() {
+  const chat = $('chat'); chat.innerHTML = '';
+  const hist = HISTORIES[ACTIVE] || [];
+  if (!CONTEXT) { chat.innerHTML = '<div class="msg system">분석된 공고가 아직 없습니다.</div>'; return; }
+  if (hist.length === 0) {
+    chat.innerHTML = `<div class="msg system">[${labelOf(ACTIVE)}] 대화를 시작하세요. 같은 질문을 다른 모델에도 물어 비교할 수 있어요.</div>`;
+  }
+  hist.forEach(m => {
+    if (m.role === 'user') {
+      const el = document.createElement('div');
+      el.className='msg user'; el.textContent=m.content;
+      chat.appendChild(el);
+    } else {
+      const row = document.createElement('div'); row.className='botrow';
+      const el = document.createElement('div'); el.className='msg bot';
+      el.innerHTML = `<div class="who">${labelOf(ACTIVE)}</div>`;
+      el.append(document.createTextNode(m.content));
+      row.appendChild(el);
+      if (m.ms != null) {
+        const t = document.createElement('span'); t.className='latency';
+        t.textContent = fmtMs(m.ms);
+        row.appendChild(t);
+      }
+      chat.appendChild(row);
+    }
+  });
+  chat.scrollTop = chat.scrollHeight;
 }
 
 async function analyze() {
   const url = $('urlInput').value.trim();
   if (!url) return;
-  $('analyzeBtn').disabled = true;
-  $('analyzeBtn').innerHTML = '<span class="spinner"></span>';
+  $('analyzeBtn').disabled = true; $('analyzeBtn').innerHTML = '<span class="spinner"></span>';
   $('leftHint').style.display = 'none';
   try {
-    const r = await fetch('/api/analyze', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ url, model_key: $('modelSelect').value })
-    });
-    const d = await r.json();
+    const d = await (await fetch('/api/analyze', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ url, model_key: $('analyzeModel').value })
+    })).json();
     if (!d.ok) { alert('분석 실패: ' + d.error); return; }
-    // 포스터
     const img = $('poster');
-    if (d.poster_data_uri || d.poster_url) {
-      img.src = d.poster_data_uri || d.poster_url;
-      img.style.display = 'block';
-    } else { img.style.display = 'none'; }
+    if (d.poster_data_uri || d.poster_url) { img.src = d.poster_data_uri || d.poster_url; img.style.display='block'; }
+    else img.style.display='none';
     renderFields(d.fields);
     CONTEXT = d.context;
-    HISTORY = [];
-    $('chat').innerHTML = '';
-    addMsg('system', '공고 분석이 완료되었습니다. 무엇이든 물어보세요.');
-    $('chatInput').disabled = false; $('sendBtn').disabled = false;
-    $('chips').style.display = 'flex';
-  } catch (e) {
-    alert('오류: ' + e.message);
-  } finally {
-    $('analyzeBtn').disabled = false;
-    $('analyzeBtn').textContent = '분석';
+    // 모델별 대화 내역 초기화 (새 공고)
+    MODELS.forEach(m => HISTORIES[m.key] = []);
+    renderToggle(); renderChat();
+    $('chatInput').disabled=false; $('sendBtn').disabled=false; $('chips').style.display='flex';
+  } catch(e) { alert('오류: '+e.message); }
+  finally { $('analyzeBtn').disabled=false; $('analyzeBtn').textContent='분석'; }
+}
+
+// 한 모델에 메시지 전송 (해당 모델 history에 append)
+async function askModel(modelKey, text) {
+  HISTORIES[modelKey].push({ role:'user', content:text });
+  const t0 = performance.now();
+  try {
+    const d = await (await fetch('/api/chat', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ messages: HISTORIES[modelKey], context: CONTEXT, model_key: modelKey })
+    })).json();
+    const ans = d.ok ? d.answer : ('오류: ' + d.error);
+    HISTORIES[modelKey].push({ role:'assistant', content:ans, ms: performance.now()-t0 });
+  } catch(e) {
+    HISTORIES[modelKey].push({ role:'assistant', content:'오류: '+e.message, ms: performance.now()-t0 });
   }
 }
 
 async function send() {
   const text = $('chatInput').value.trim();
   if (!text || !CONTEXT) return;
-  $('chatInput').value = '';
-  addMsg('user', text);
-  HISTORY.push({ role: 'user', content: text });
-  $('sendBtn').disabled = true;
-  const thinking = addMsg('bot', '…');
-  try {
-    const r = await fetch('/api/chat', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ messages: HISTORY, context: CONTEXT, model_key: $('modelSelect').value })
-    });
-    const d = await r.json();
-    const answer = d.ok ? d.answer : ('오류: ' + d.error);
-    thinking.textContent = answer;
-    if (d.ok) HISTORY.push({ role: 'assistant', content: answer });
-  } catch (e) {
-    thinking.textContent = '오류: ' + e.message;
-  } finally {
-    $('sendBtn').disabled = false;
-    $('chatInput').focus();
+  $('chatInput').value=''; $('sendBtn').disabled=true;
+  const broadcast = $('bcast').checked;
+  const targets = broadcast ? MODELS.map(m=>m.key) : [ACTIVE];
+
+  // 현재 화면(ACTIVE)에 사용자 메시지 + 로딩 즉시 표시
+  renderChat();
+  const chat = $('chat');
+  const um = document.createElement('div'); um.className='msg user'; um.textContent=text; chat.appendChild(um);
+  const load = document.createElement('div'); load.className='msg bot'; load.innerHTML=`<div class="who">${labelOf(ACTIVE)}</div>`; load.append(document.createTextNode('…')); chat.appendChild(load);
+  chat.scrollTop = chat.scrollHeight;
+
+  await Promise.all(targets.map(k => askModel(k, text)));
+
+  renderToggle(); renderChat();
+  if (broadcast) {
+    const sys = document.createElement('div'); sys.className='msg system';
+    sys.textContent = '✓ 3개 모델에 전송됨 — 상단 토글로 모델별 답변을 비교하세요.';
+    $('chat').appendChild(sys); $('chat').scrollTop = $('chat').scrollHeight;
   }
+  $('sendBtn').disabled=false; $('chatInput').focus();
 }
 
+// 이벤트
 $('analyzeBtn').addEventListener('click', analyze);
-$('urlInput').addEventListener('keydown', e => { if (e.key==='Enter') analyze(); });
+$('urlInput').addEventListener('keydown', e => { if(e.key==='Enter') analyze(); });
 $('sendBtn').addEventListener('click', send);
-$('chatInput').addEventListener('keydown', e => { if (e.key==='Enter') send(); });
+$('chatInput').addEventListener('keydown', e => { if(e.key==='Enter') send(); });
 $('chips').addEventListener('click', e => {
-  if (e.target.classList.contains('chip')) { $('chatInput').value = e.target.textContent; send(); }
+  const chip = e.target.closest('.chip'); if(!chip) return;
+  $('chatInput').value = chip.dataset.q || chip.textContent;
+  if (chip.classList.contains('edit')) { $('chatInput').focus(); }  // 직접 입력: 보내기 전 수정
+  else { send(); }                                                  // 바로 전송
+});
+$('toggle').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-k]'); if(!btn) return;
+  ACTIVE = btn.dataset.k; renderToggle(); renderChat();
 });
 loadModels();
 </script>

@@ -17,6 +17,7 @@
 import base64
 import json
 import os
+import re
 from typing import Optional
 from urllib.parse import urljoin, urlparse
 
@@ -35,9 +36,18 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "30"))
 MAX_TEXT_CHARS = int(os.getenv("MAX_TEXT_CHARS", "8000"))
+# 출력 토큰 상한. 미지정 시 일부 제공자(OpenRouter)가 모델 최대치를 통째로
+# 예약해 402(크레딧 부족)가 날 수 있어 합리적 상한을 둔다.
+MAX_OUTPUT_TOKENS = int(os.getenv("MAX_OUTPUT_TOKENS", "2048"))
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+)
+
+# 본문 포스터가 아닌 장식용 이미지(로고/아이콘/SNS 등)를 거르기 위한 힌트
+SKIP_IMG_HINTS = (
+    "logo", "icon", "sprite", "avatar", "favicon", "blank", "spacer",
+    "pixel", "button", "badge", "share", "sns", "footer", "header",
 )
 
 
@@ -132,25 +142,37 @@ def extract_main_text(soup: BeautifulSoup) -> str:
 
 
 def find_poster_url(soup: BeautifulSoup, page_url: str) -> Optional[str]:
-    # 1) Open Graph / Twitter 이미지 우선
+    # 1) Open Graph / Twitter 이미지 우선 (공고/기사 페이지 대부분이 대표 이미지로 지정)
     for prop in ("og:image", "twitter:image", "og:image:url"):
         tag = soup.find("meta", property=prop) or soup.find("meta", attrs={"name": prop})
         if tag and tag.get("content"):
             return urljoin(page_url, tag["content"])
-    # 2) 본문에서 가장 큰(가로폭 큰) 이미지 추정
+    # 2) 메타태그가 없으면 본문 <img> 중 대표 이미지를 추정한다.
+    #    - 로고/아이콘/SNS 등 장식 이미지는 키워드로 제외
+    #    - svg/gif 및 작은 이미지(선언 크기 100px 미만)는 제외
+    #    - 선언된 크기가 클수록 우선, 동점이면 먼저 나온(보통 본문) 이미지를 유지
     best = None
-    best_score = 0
+    best_score = -1
     for img in soup.find_all("img"):
-        src = img.get("src") or img.get("data-src")
-        if not src:
+        src = img.get("src") or img.get("data-src") or img.get("data-original")
+        if not src or src.startswith("data:"):
+            continue
+        hay = " ".join(
+            str(img.get(attr, "")) for attr in ("src", "class", "id", "alt")
+        ).lower()
+        if any(hint in hay for hint in SKIP_IMG_HINTS):
+            continue
+        if src.lower().split("?")[0].endswith((".svg", ".gif")):
             continue
         try:
             w = int(img.get("width", 0))
             h = int(img.get("height", 0))
         except (TypeError, ValueError):
             w = h = 0
+        if (w and w < 100) or (h and h < 100):
+            continue
         score = w * h
-        if score >= best_score:
+        if score > best_score:
             best_score = score
             best = urljoin(page_url, src)
     return best
@@ -171,6 +193,24 @@ def image_to_data_uri(img_url: str) -> Optional[str]:
         return None
 
 
+_REASONING_RE = re.compile(
+    r"<(thought|think|reasoning)>.*?</\1>", re.DOTALL | re.IGNORECASE
+)
+
+
+def strip_reasoning(text: str) -> str:
+    """일부 모델(예: Gemma 4)이 답변 앞에 붙이는 <thought>...</thought> 추론 블록을 제거한다."""
+    out = _REASONING_RE.sub("", text)
+    # 균형이 맞지 않는(잘린) 추론 태그 잔여물 정리
+    out = re.sub(
+        r"^.*?</(?:thought|think|reasoning)>", "", out, flags=re.DOTALL | re.IGNORECASE
+    )
+    out = re.sub(
+        r"<(?:thought|think|reasoning)>.*$", "", out, flags=re.DOTALL | re.IGNORECASE
+    )
+    return out.strip()
+
+
 def call_llm(model_key: str, messages: list, temperature: float = 0.2) -> str:
     cfg = MODELS.get(model_key) or MODELS[DEFAULT_MODEL_KEY]
     url = cfg["base_url"].rstrip("/") + "/chat/completions"
@@ -181,11 +221,12 @@ def call_llm(model_key: str, messages: list, temperature: float = 0.2) -> str:
         "model": cfg["model"],
         "messages": messages,
         "temperature": temperature,
+        "max_tokens": MAX_OUTPUT_TOKENS,
     }
     resp = requests.post(url, headers=headers, json=payload, timeout=120)
     resp.raise_for_status()
     data = resp.json()
-    return data["choices"][0]["message"]["content"]
+    return strip_reasoning(data["choices"][0]["message"]["content"])
 
 
 def build_vision_user_content(text: str, poster_data_uri: Optional[str]) -> list:
