@@ -1,0 +1,16 @@
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: n8n
+    restart: unless-stopped          # Docker 재시작/재부팅 시 자동 복구
+    ports:
+      - "5678:5678"
+    environment:
+      - GENERIC_TIMEZONE=Asia/Seoul  # 크론(14시/18시) 타임존
+      - TZ=Asia/Seoul
+      - N8N_SECURE_COOKIE=false       # http://localhost 접속 허용
+    volumes:
+      - n8n_data:/home/node/.n8n      # 워크플로우/자격증명 영구 보존
+
+volumes:
+  n8n_data:

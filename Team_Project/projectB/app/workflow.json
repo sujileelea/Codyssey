@@ -1,0 +1,921 @@
+{
+  "name": "뉴스 요약 자동화 워크플로우",
+  "active": false,
+  "settings": {
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all",
+    "executionOrder": "v1",
+    "timezone": "Asia/Seoul"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 14,18 * * *"
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-0001-4a1b-8c2d-000000000001",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "notes": "매일 14:00, 18:00 (Asia/Seoul). 타임존은 워크플로우 Settings의 timezone(Asia/Seoul)을 따른다."
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "f4cb36b4185a46e68fc54be4ac32feb5",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "options": {},
+        "simple": false
+      },
+      "id": "a1b2c3d4-00d0-4a1b-8c2d-0000000000d0",
+      "name": "Get Existing Dedup Keys",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        -220,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 2,
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_WITH_NOTION_CREDENTIAL_ID",
+          "name": "notion_credential"
+        }
+      },
+      "notes": "실행 시작 시 DB의 모든 페이지를 1회 조회. ★Simplify(simple)=false 필수★ — 켜져 있으면 출력에 '중복 방지 키'가 빠져 Filter Unsaved가 dedup_key를 못 찾는다. simple=false 라야 properties.중복방지키.rich_text[0].plain_text 까지 출력됨."
+    },
+    {
+      "parameters": {
+        "maxItems": 1
+      },
+      "id": "a1b2c3d4-00d2-4a1b-8c2d-0000000000d2",
+      "name": "Reduce To One",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        -20,
+        300
+      ],
+      "notes": "이후 RSS Read가 1회만 실행되도록 항목을 1개로 축소(저장키 전체는 Get Existing Dedup Keys.all()로 참조)."
+    },
+    {
+      "parameters": {
+        "url": "https://biz.heraldcorp.com/rss/google/it",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0002-4a1b-8c2d-00000000002a",
+      "name": "Herald RSS Read",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f1110000-0000-4000-8000-00000000003a",
+              "leftValue": "={{ (() => { const t=($json.title||'').toString(); const hasReq=!!($json.title && $json.link && $json.pubDate && ($json.content||$json.contentSnippet)); const hasAI=/\\bAI\\b/.test(t) || t.includes('인공지능'); return hasReq && hasAI; })() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0003-4a1b-8c2d-00000000003a",
+      "name": "Herald Keyword Filter",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        120
+      ],
+      "notes": "AI 뉴스 판별: 제목에 'AI'(단어 경계 \\bAI\\b) 또는 '인공지능' 포함 시 통과 + 필수 필드(title/link/pubDate/content) 검사. \\bAI\\b로 RAID/SAID 등 오탐 방지."
+    },
+    {
+      "parameters": {
+        "maxItems": 20
+      },
+      "id": "a1b2c3d4-0004-4a1b-8c2d-00000000004a",
+      "name": "Herald Limit",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        660,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://feeds.bbci.co.uk/news/technology/rss.xml",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0002-4a1b-8c2d-00000000002b",
+      "name": "BBC RSS Read",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f1110000-0000-4000-8000-00000000003b",
+              "leftValue": "={{ (() => { const t=($json.title||'').toString(); const hasReq=!!($json.title && $json.link && $json.pubDate && ($json.content||$json.contentSnippet)); const hasAI=/\\bAI\\b/.test(t) || t.includes('인공지능'); return hasReq && hasAI; })() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0003-4a1b-8c2d-00000000003b",
+      "name": "BBC Keyword Filter",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        480
+      ],
+      "notes": "AI 뉴스 판별: 제목에 'AI'(단어 경계 \\bAI\\b) 또는 '인공지능' 포함 시 통과 + 필수 필드 검사. (영문 제목도 동일 규칙)"
+    },
+    {
+      "parameters": {
+        "maxItems": 20
+      },
+      "id": "a1b2c3d4-0004-4a1b-8c2d-00000000004b",
+      "name": "BBC Limit",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        660,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "numberInputs": 2
+      },
+      "id": "a1b2c3d4-0005-4a1b-8c2d-000000000005",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "60000000-0000-4000-8000-000000000061",
+              "name": "source",
+              "value": "={{ ($json.link || '').toLowerCase().includes('herald') ? '헤럴드' : 'BBC' }}",
+              "type": "string"
+            },
+            {
+              "id": "60000000-0000-4000-8000-000000000062",
+              "name": "ai_score",
+              "value": "={{ (() => { const k=['ai','artificial intelligence','인공지능','생성형 ai','generative ai','llm','머신러닝','machine learning']; const t=(($json.title||'')+' '+($json.content||$json.contentSnippet||'')).toLowerCase(); return k.some(x=>t.includes(x)) ? 1 : 0; })() }}",
+              "type": "number"
+            },
+            {
+              "id": "60000000-0000-4000-8000-000000000063",
+              "name": "pub_date_str",
+              "value": "={{ $json.pubDate ? new Date($json.pubDate).toISOString() : '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "a1b2c3d4-0006-4a1b-8c2d-000000000006",
+      "name": "Add Source & AI Score",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "type": "simple",
+        "sortFieldsUI": {
+          "sortField": [
+            {
+              "fieldName": "ai_score",
+              "order": "descending"
+            },
+            {
+              "fieldName": "pubDate",
+              "order": "descending"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0007-4a1b-8c2d-000000000007",
+      "name": "Sort",
+      "type": "n8n-nodes-base.sort",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ $json.link }}",
+        "dataPropertyName": "url_hash",
+        "encoding": "hex"
+      },
+      "id": "a1b2c3d4-0009-4a1b-8c2d-000000000009",
+      "name": "Generate URL Hash",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "60000000-0000-4000-8000-000000000101",
+              "name": "dedup_key",
+              "value": "={{ $json.url_hash }}|{{ $json.guid ?? '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "a1b2c3d4-0010-4a1b-8c2d-000000000010",
+      "name": "Build Dedup Key",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1980,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f1110000-0000-4000-8000-0000000000d1",
+              "leftValue": "={{ (() => { const dk = String($json.dedup_key || ''); if (!dk) return true; const pages = $('Get Existing Dedup Keys').all(); const saved = pages.some(p => JSON.stringify(p.json || {}).includes(dk)); return !saved; })() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-00d1-4a1b-8c2d-0000000000d1",
+      "name": "Filter Unsaved",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        2200,
+        300
+      ],
+      "notes": "이미 저장된 기사 제거: 시작에 조회한 모든 페이지(Get Existing Dedup Keys)를 통째로 문자열화해 dedup_key 포함 여부 검사(출력 구조 무관, 64자 해시+URL이라 오탐 없음). 미저장 후보만 통과."
+    },
+    {
+      "parameters": {
+        "maxItems": 1
+      },
+      "id": "a1b2c3d4-0008-4a1b-8c2d-000000000008",
+      "name": "Select 1 Unsaved",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        2420,
+        300
+      ],
+      "notes": "미저장 후보 중 정렬 1위(ai_score↓, 최신순) 1건 선택. 이후 단계는 이 노드를 기준으로 참조."
+    },
+    {
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-nano",
+          "cachedResultName": "gpt-4.1-nano"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "당신은 IT 뉴스 분류기이자 뉴스 요약기입니다.",
+              "role": "system"
+            },
+            {
+              "content": "=아래 AI 관련 기사를 한국어로 요약하고, 제목을 한국어로 번역하세요.\n\n규칙:\n1. is_target은 항상 true로 둡니다(이 기사는 이미 제목에 AI가 포함되어 선별됨).\n2. summary에 기사 내용으로 한국어 3줄 이내 요약을 작성합니다.\n3. title_ko에 기사 제목을 자연스러운 한국어로 번역해 넣습니다. 제목이 이미 한국어면 그대로 둡니다.\n4. 원문에 없는 내용을 추가하지 않습니다.\n5. 과장된 해석이나 추측을 넣지 않습니다.\n6. image_prompt는 기사 핵심을 시각화한 영어 이미지 생성 프롬프트입니다. 기사의 핵심 주체/소재/상황을 구체적인 시각 요소(사물, 장면, 행위, 분위기)로 묘사하세요. 추상적 표현 금지, 텍스트/로고/워터마크 없이 사실적인 테크 에디토리얼 일러스트 스타일로 작성합니다.\n7. 반드시 아래 JSON 형식만 출력합니다.\n\n출력 형식:\n{\n  \"is_target\": true,\n  \"title_ko\": \"한국어로 번역된 제목\",\n  \"summary\": [\"첫 번째 요약\", \"두 번째 요약\", \"세 번째 요약\"],\n  \"reason\": \"요약 근거\",\n  \"image_prompt\": \"Realistic editorial tech illustration depicting [기사 핵심을 나타내는 구체적 장면과 사물], modern professional lighting, clean composition, no text, no logos, no watermark\"\n}\n\n제목: {{ $('Select 1 Unsaved').first().json.title }}\n본문: {{ $('Select 1 Unsaved').first().json.content ?? $('Select 1 Unsaved').first().json.contentSnippet ?? '' }}\n원문 링크: {{ $('Select 1 Unsaved').first().json.link }}",
+              "role": "user"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {}
+      },
+      "id": "a1b2c3d4-0013-4a1b-8c2d-000000000013",
+      "name": "OpenAI Summary",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        2640,
+        460
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_OPENAI_CREDENTIAL_ID",
+          "name": "openai_credential"
+        }
+      },
+      "notes": "gpt-4o-mini. 기사 원문은 Build Dedup Key 노드의 item을 직접 참조(중복 조회 노드가 item을 교체해도 기사 데이터 유지). jsonOutput=true."
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "60000000-0000-4000-8000-000000000141",
+              "name": "is_target",
+              "value": "={{ (() => { let c = $json.message?.content ?? $json.content ?? $json.text ?? $json.choices?.[0]?.message?.content ?? $json; if (typeof c === 'string') { try { c = JSON.parse(c); } catch(e) { return false; } } return c?.is_target === true; })() }}",
+              "type": "boolean"
+            },
+            {
+              "id": "60000000-0000-4000-8000-000000000145",
+              "name": "title_ko",
+              "value": "={{ (() => { let c = $json.message?.content ?? $json.content ?? $json.text ?? $json.choices?.[0]?.message?.content ?? $json; if (typeof c === 'string') { try { c = JSON.parse(c); } catch(e) { return ''; } } return c?.title_ko ?? ''; })() }}",
+              "type": "string"
+            },
+            {
+              "id": "60000000-0000-4000-8000-000000000142",
+              "name": "summary_lines",
+              "value": "={{ (() => { let c = $json.message?.content ?? $json.content ?? $json.text ?? $json.choices?.[0]?.message?.content ?? $json; if (typeof c === 'string') { try { c = JSON.parse(c); } catch(e) { return []; } } return c?.summary ?? []; })() }}",
+              "type": "array"
+            },
+            {
+              "id": "60000000-0000-4000-8000-000000000143",
+              "name": "image_prompt",
+              "value": "={{ (() => { let c = $json.message?.content ?? $json.content ?? $json.text ?? $json.choices?.[0]?.message?.content ?? $json; if (typeof c === 'string') { try { c = JSON.parse(c); } catch(e) { return ''; } } return c?.image_prompt ?? ''; })() }}",
+              "type": "string"
+            },
+            {
+              "id": "60000000-0000-4000-8000-000000000144",
+              "name": "ai_reason",
+              "value": "={{ (() => { let c = $json.message?.content ?? $json.content ?? $json.text ?? $json.choices?.[0]?.message?.content ?? $json; if (typeof c === 'string') { try { c = JSON.parse(c); } catch(e) { return ''; } } return c?.reason ?? ''; })() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "a1b2c3d4-0014-4a1b-8c2d-000000000014",
+      "name": "Parse AI JSON",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2860,
+        460
+      ],
+      "notes": "OpenAI 응답(message.content)을 파싱. jsonOutput=true면 객체, 아니면 문자열 → 둘 다 대응."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f1110000-0000-4000-8000-000000000015",
+              "leftValue": "={{ $json.is_target }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0015-4a1b-8c2d-000000000015",
+      "name": "Is AI/IT Target?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3080,
+        460
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-0015-4a1b-8c2d-0000000150cc",
+      "name": "Skip - Not Target",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3300,
+        280
+      ],
+      "notes": "AI/IT 대상이 아님 → 스킵(로그)."
+    },
+    {
+      "parameters": {
+        "url": "=https://image.pollinations.ai/prompt/{{ encodeURIComponent($('Parse AI JSON').first().json.image_prompt || 'editorial thumbnail for tech news, no text, modern clean style') }}?width=1024&height=1024&nologo=true&seed={{ parseInt(($('Select 1 Unsaved').first().json.url_hash || '0').slice(0,8), 16) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "a1b2c3d4-0016-4a1b-8c2d-000000000016",
+      "name": "Pollinations Image Generate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3340,
+        620
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "notes": "무료 AI 이미지 생성(Pollinations). image_prompt(기사별 GPT 프롬프트) + seed(url_hash 기반 기사별 고유값)로 기사마다 다른 이미지. pre-warm용이며 저장 URL(notion_thumb_url)과 동일하게 구성."
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "60000000-0000-4000-8000-000000000181",
+              "name": "notion_title",
+              "value": "={{ ($('Parse AI JSON').first().json.title_ko || $('Select 1 Unsaved').first().json.title || '').toString().trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "60000000-0000-4000-8000-000000000182",
+              "name": "notion_summary",
+              "value": "={{ (Array.isArray($('Parse AI JSON').first().json.summary_lines) ? $('Parse AI JSON').first().json.summary_lines.slice(0,3) : []).join('\\n').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "60000000-0000-4000-8000-000000000183",
+              "name": "notion_url",
+              "value": "={{ $('Select 1 Unsaved').first().json.link }}",
+              "type": "string"
+            },
+            {
+              "id": "60000000-0000-4000-8000-000000000184",
+              "name": "notion_date",
+              "value": "={{ ($('Select 1 Unsaved').first().json.pub_date_str || '').toString().slice(0,10) }}",
+              "type": "string"
+            },
+            {
+              "id": "60000000-0000-4000-8000-000000000185",
+              "name": "notion_source",
+              "value": "={{ $('Select 1 Unsaved').first().json.source }}",
+              "type": "string"
+            },
+            {
+              "id": "60000000-0000-4000-8000-000000000186",
+              "name": "notion_dedup_key",
+              "value": "={{ $('Select 1 Unsaved').first().json.dedup_key }}",
+              "type": "string"
+            },
+            {
+              "id": "60000000-0000-4000-8000-000000000187",
+              "name": "notion_thumb_url",
+              "value": "=https://image.pollinations.ai/prompt/{{ encodeURIComponent($('Parse AI JSON').first().json.image_prompt || 'editorial thumbnail for tech news, no text, modern clean style') }}?width=1024&height=1024&nologo=true&seed={{ parseInt(($('Select 1 Unsaved').first().json.url_hash || '0').slice(0,8), 16) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "a1b2c3d4-0018-4a1b-8c2d-000000000018",
+      "name": "Normalize Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3740,
+        620
+      ],
+      "notes": "Notion 저장용 필드 정규화. 바이너리(다운로드한 이미지)는 includeOtherFields=true 로 유지됨."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/pages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"parent\": { \"database_id\": \"f4cb36b4185a46e68fc54be4ac32feb5\" }, \"properties\": { \"제목\": { \"title\": [ { \"text\": { \"content\": {{ JSON.stringify($json.notion_title || '(제목 없음)') }} } } ] }, \"요약문\": { \"rich_text\": [ { \"text\": { \"content\": {{ JSON.stringify($json.notion_summary || '') }} } } ] }, \"원문 링크\": { \"url\": {{ JSON.stringify($json.notion_url || 'https://example.com') }} }, \"발행 일시\": { \"date\": { \"start\": {{ JSON.stringify($json.notion_date || '2026-01-01') }} } }, \"출처\": { \"select\": { \"name\": {{ JSON.stringify($json.notion_source || 'BBC') }} } }, \"중복 방지 키\": { \"rich_text\": [ { \"text\": { \"content\": {{ JSON.stringify($json.notion_dedup_key || '') }} } } ] }, \"썸네일\": { \"files\": [ { \"type\": \"external\", \"name\": \"thumbnail.jpg\", \"external\": { \"url\": {{ JSON.stringify($json.notion_thumb_url || 'https://image.pollinations.ai/prompt/tech') }} } } ] } } }",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0019-4a1b-8c2d-000000000019",
+      "name": "Notion Save",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3960,
+        620
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_WITH_NOTION_CREDENTIAL_ID",
+          "name": "notion_credential"
+        }
+      },
+      "notes": "Notion 페이지 생성을 raw HTTP(POST /v1/pages)로 처리 — 네이티브 노드의 속성 바인딩 문제 회피. 본문에 모든 속성이 JSON으로 명시돼 import 바인딩 불필요. 인증은 Notion account credential 선택만 하면 됨."
+    },
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-00e0-4a1b-8c2d-0000000000e0",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        780
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-00e1-4a1b-8c2d-0000000000e1",
+      "name": "Error Notify (placeholder)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        220,
+        780
+      ],
+      "notes": "실패 정보는 n8n 실행 로그에 기록됨. 알림이 필요하면 owner가 이 No Operation 노드를 Slack/Email 노드로 교체할 것."
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Existing Dedup Keys",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Existing Dedup Keys": {
+      "main": [
+        [
+          {
+            "node": "Reduce To One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reduce To One": {
+      "main": [
+        [
+          {
+            "node": "Herald RSS Read",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "BBC RSS Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Herald RSS Read": {
+      "main": [
+        [
+          {
+            "node": "Herald Keyword Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Herald Keyword Filter": {
+      "main": [
+        [
+          {
+            "node": "Herald Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Herald Limit": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BBC RSS Read": {
+      "main": [
+        [
+          {
+            "node": "BBC Keyword Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BBC Keyword Filter": {
+      "main": [
+        [
+          {
+            "node": "BBC Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BBC Limit": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Add Source & AI Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Source & AI Score": {
+      "main": [
+        [
+          {
+            "node": "Sort",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort": {
+      "main": [
+        [
+          {
+            "node": "Generate URL Hash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate URL Hash": {
+      "main": [
+        [
+          {
+            "node": "Build Dedup Key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Dedup Key": {
+      "main": [
+        [
+          {
+            "node": "Filter Unsaved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Unsaved": {
+      "main": [
+        [
+          {
+            "node": "Select 1 Unsaved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select 1 Unsaved": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Summary": {
+      "main": [
+        [
+          {
+            "node": "Parse AI JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI JSON": {
+      "main": [
+        [
+          {
+            "node": "Is AI/IT Target?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is AI/IT Target?": {
+      "main": [
+        [
+          {
+            "node": "Pollinations Image Generate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip - Not Target",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pollinations Image Generate": {
+      "main": [
+        [
+          {
+            "node": "Normalize Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Fields": {
+      "main": [
+        [
+          {
+            "node": "Notion Save",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Error Notify (placeholder)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

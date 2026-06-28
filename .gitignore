@@ -1,6 +1,11 @@
 # ===== OS / 기타 =====
 *.DS_Store*
 *outline*
+*.claude*
+.env
+*.env
+KEY.rtf
+KEY.txt
 
 # ===== Python =====
 __pycache__/
