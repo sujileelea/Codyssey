@@ -1,0 +1,97 @@
+{
+  "database": {
+    "path": "data/news.db",
+    "news_table": "news",
+    "insights_table": "insights",
+    "sentiments_table": "sentiment_results",
+    "columns": {
+      "id": "id",
+      "title": "title",
+      "content": "content",
+      "summary": "summary",
+      "category": "category",
+      "source": "source",
+      "published_at": "published_at"
+    }
+  },
+  "cleaning": {
+    "duplicate_policy": "skip",
+    "categories": [
+      "국내",
+      "세계",
+      "북한",
+      "건강·과학",
+      "문화"
+    ],
+    "category_map": {}
+  },
+  "sources": {
+    "rss": {
+      "name": "bbc_korean",
+      "url": "https://feeds.bbci.co.uk/korean/rss.xml"
+    },
+    "crawl": {
+      "name": "bbc_korean",
+      "base_url": "https://www.bbc.com",
+      "topics": {
+        "국내": "cxnyk3v82rgt",
+        "세계": "ce71k82r6gzt",
+        "북한": "cg726kygwz9t",
+        "건강·과학": "cly27z42zk7t",
+        "문화": "c8y946p5qknt"
+      },
+      "article_link_pattern": "/korean/articles/",
+      "body_selector": "main p",
+      "exclude_selectors": [
+        "figure",
+        "figcaption",
+        "[data-testid=byline]",
+        "[data-testid=caption-paragraph]",
+        "header",
+        "footer",
+        "nav",
+        "aside"
+      ]
+    }
+  },
+  "http": {
+    "timeout": 10,
+    "retries": 2,
+    "delay_seconds": 1.5,
+    "user_agent": "A-projectB-news-cli/0.1 (Codyssey study project; contact: dev-team@sigongan.com)"
+  },
+  "ai": {
+    "provider": "gemini",
+    "api_key_env": "GEMINI_API_KEY",
+    "model": "gemini-3.5-flash-lite",
+    "max_output_tokens": 1800,
+    "timeout": 60,
+    "min_interval_seconds": 4.5,
+    "rate_limit_retries": 3
+  },
+  "summary": {
+    "max_chars": 300,
+    "default_limit": 10,
+    "max_ai_attempts": 2
+  },
+  "analysis": {
+    "batch_size": 20,
+    "default_limit": 50,
+    "max_limit": 200,
+    "max_ai_attempts": 2
+  },
+  "sentiment": {
+    "default_limit": 20,
+    "max_limit": 100,
+    "max_ai_attempts": 2
+  },
+  "report": {
+    "font_family": null,
+    "top_n": 5,
+    "output_dir": "output"
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "logs/app.log"
+  }
+}
