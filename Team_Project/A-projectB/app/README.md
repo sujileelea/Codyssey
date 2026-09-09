@@ -26,34 +26,189 @@ fetch ──▶ raw_news ──▶ clean ──▶ news ──▶ summarize ─�
 
 ## 1. 설치
 
-- Python **3.10 이상**
+### 1-1. 사전 준비
+
+| 항목 | 내용 |
+| --- | --- |
+| Python | **3.10 이상** — `python3 --version`으로 확인 (Windows는 `python --version`) |
+| Git | 저장소 clone용 |
+| Gemini API 키 | [Google AI Studio](https://aistudio.google.com/) → **Get API key** → 무료 발급 (카드 등록 불필요) |
+| 인터넷 | BBC 코리아 수집 · Gemini 호출 |
+
+### 1-2. 저장소 받기
 
 ```bash
-cd app
-python3 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env                                  # GEMINI_API_KEY=... 입력 (Google AI Studio 무료 키)
+git clone -b develop https://github.com/sujileelea/Codyssey.git
+cd Codyssey/Team_Project/A-projectB/app
 ```
 
-- API 키는 코드·`config.json`에 두지 않음 — `config.json`의 `ai.api_key_env`에는 **환경변수 이름**만, 값은 `.env` 또는 셸 환경변수
-- `.env` · `data/` · `logs/` · `.venv/`는 git 제외
-- 키 없이 파이프라인만 확인: `config.json`의 `ai.provider`를 `"mock"`으로 변경
+- 이미 받은 저장소라면 `git pull origin develop` 후 `Team_Project/A-projectB/app`으로 이동
+
+### 1-3. 가상환경과 의존성
+
+macOS / Linux
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Windows (PowerShell)
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1        # 실행 정책 오류 시: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+pip install -r requirements.txt
+```
+
+- 설치 패키지: `requests` `beautifulsoup4` `google-genai` `matplotlib` `openpyxl` `pytest`
+- 이후 모든 명령은 **가상환경이 활성화된 상태**, **`app/` 디렉터리에서** 실행
+
+### 1-4. API 키 설정
+
+```bash
+cp .env.example .env          # Windows: copy .env.example .env
+```
+
+- `.env` 파일을 열어 한 줄 입력: `GEMINI_API_KEY=발급받은키`
+- 키는 `.env`에만 두고 `config.json`·코드에는 쓰지 않음 (`.env`는 git 제외)
+- `.env` 대신 셸 환경변수도 가능: `export GEMINI_API_KEY=...` (Windows PowerShell: `$env:GEMINI_API_KEY="..."`)
+- **키 없이 흐름만 확인**: `config.json`의 `"provider": "gemini"` → `"mock"` 으로 변경 → 요약·분석·감성이 자리표시 텍스트로 동작
+
+### 1-5. 설정 파일 (`config.json`)
+
+| 키 | 기본값 | 의미 |
+| --- | --- | --- |
+| `database.path` | `data/news.db` | SQLite 파일 (없으면 자동 생성) |
+| `cleaning.duplicate_policy` | `skip` | 같은 URL 처리 — `skip` 저장 안 함 / `upsert` 갱신 |
+| `cleaning.categories` | 국내·세계·북한·건강·과학·문화 | 표준 카테고리 목록 (그 외는 `기타`) |
+| `sources.rss.url` | BBC 코리아 RSS | 방법 1 소스 |
+| `sources.crawl.topics` | 섹션 id 5개 | 방법 2 소스 (섹션명 → topic id) |
+| `http.timeout` / `retries` / `delay_seconds` | 10 / 2 / 1.5 | HTTP 타임아웃(초) · 재시도 · 요청 간 지연(초) |
+| `ai.provider` / `ai.model` | `gemini` / `gemini-3.5-flash-lite` | `mock`이면 키 불필요 |
+| `ai.min_interval_seconds` / `rate_limit_retries` | 4.5 / 3 | 무료 티어 분당 한도 대응 |
+| `summary.default_limit` | 10 | `summarize` 기본 처리 건수 |
+| `analysis.batch_size` / `default_limit` | 20 / 50 | 배치 크기 · 분석 대상 기본 건수 |
+| `report.output_dir` | `output` | 리포트·차트·내보내기 저장 위치 |
+| `logging.level` / `file` | `INFO` / `logs/app.log` | 콘솔 + 파일 로그 |
 
 ---
 
-## 2. 실행 순서
+## 2. 실행 방법
+
+### 2-1. 전체 파이프라인 (처음 실행하는 경우)
+
+아래 순서대로 실행 — 각 단계가 앞 단계의 저장 결과를 읽으므로 순서 유지
 
 ```bash
-python main.py fetch --limit 10                 # 1. 수집: 섹션 5개 × 10건 크롤링 + RSS 10건 (본문 보강)
-python main.py clean                            # 2. 정제·중복 처리 → news
-python main.py summarize --unsummarized         # 3. AI 요약 (기본 10건, --limit 로 조정)
-python main.py analyze                          # 4. AI 인사이트 분석 (요약된 기사 종합)
-python main.py sentiment --limit 20             # 5. [보너스] 감성 분석
-python main.py report                           # 6. 리포트 + 차트 (output/)
-python main.py export --format xlsx             # 7. 내보내기 (output/exports/)
+# 1. 수집: 섹션 5개 × 10건 크롤링 + RSS 10건 → data/news.db 의 raw_news  (약 1분 30초)
+python main.py fetch --limit 10
+
+# 2. 정제: raw_news → 필수 필드 검증·정규화·날짜 통일·중복 처리 → news  (수 초)
+python main.py clean
+
+# 3. AI 요약: 미요약 뉴스를 Gemini로 요약 → news.summary  (건당 약 5초, 20건이면 약 2분)
+python main.py summarize --unsummarized --limit 20
+
+# 4. AI 인사이트: 요약된 뉴스를 종합 분석 → insights  (배치당 약 5초)
+python main.py analyze
+
+# 5. [보너스] 감성 분석: 기사별 긍정/중립/부정 → sentiment_results  (건당 약 5초)
+python main.py sentiment --limit 20
+
+# 6. 리포트 + 차트: output/report.md, output/charts/*.png
+python main.py report
+
+# 7. 내보내기: output/exports/
+python main.py export --format csv --status summarized
+python main.py export --format xlsx
 ```
 
-- `analyze`는 **요약이 있는 기사만** 정성 분석에 사용 → `summarize` 선행 필요
+- 각 단계의 기대 출력은 §3 "실행 예시"와 `../제출물/실행 결과.md` 참고
+- 진행 로그는 콘솔에 `[INFO]`/`[WARNING]`/`[ERROR]`로 출력되고 `logs/app.log`에도 기록
+
+### 2-2. 단계별 자주 쓰는 옵션
+
+```bash
+# 수집
+python main.py fetch --source rss --limit 20          # RSS만 (본문은 기사 페이지 크롤링으로 보강)
+python main.py fetch --source crawl --category 세계    # 세계 섹션만 크롤링
+python main.py fetch --source rss --no-body           # RSS 요약문만, 본문 보강 생략 (요청 최소화)
+
+# 정제
+python main.py clean --duplicate-policy upsert        # 같은 URL이면 갱신
+python main.py clean --all                            # 처리된 raw까지 전건 재정제
+
+# 요약
+python main.py summarize --all                        # 전건 대상 (이미 요약된 건은 스킵)
+python main.py summarize --id 12 34                   # 특정 ID
+python main.py summarize --id 12 --force              # 이미 요약된 건도 다시 요약
+
+# 인사이트 분석
+python main.py analyze --category 국내 --limit 30
+python main.py analyze --date-from 2026-09-01 --date-to 2026-09-09
+python main.py analyze --list                         # 저장된 분석 목록
+python main.py analyze --show 1                       # 저장된 분석 재조회
+
+# 감성 (보너스)
+python main.py sentiment --category 문화 --limit 10
+python main.py sentiment --id 44                      # 1건 분석/재분석
+python main.py sentiment --all --limit 50             # 분석된 건도 재분석
+
+# 리포트 · 내보내기
+python main.py report --format txt --no-charts
+python main.py report --category 세계 --top 3 --out output/world.md
+python main.py export --format jsonl --category 국내 --date-from 2026-09-01
+
+# 조회 (보너스)
+python main.py list --page 1 --page-size 10
+python main.py list --category 문화 --keyword 영화 --status summarized
+python main.py show 44
+
+# 도움말
+python main.py --help
+python main.py fetch --help
+```
+
+### 2-3. 결과 확인
+
+| 위치 | 내용 |
+| --- | --- |
+| `data/news.db` | SQLite — `sqlite3 data/news.db "select id, category, title from news limit 5;"` |
+| `output/report.md` · `report.txt` | 리포트 (품질 지표 · TOP N · AI 인사이트 · 감성 분포) |
+| `output/charts/*.png` | 차트 4장 |
+| `output/exports/` | 내보내기 파일 (`.csv` · `.jsonl` · `.xlsx`) |
+| `logs/app.log` | 전체 실행 로그 (시각·모듈 포함) |
+
+### 2-4. 처음부터 다시 실행
+
+```bash
+rm -f data/news.db logs/app.log && rm -rf output      # Windows: del data\news.db 등
+python main.py fetch --limit 10                       # 이후 2-1 순서 반복
+```
+
+- `news.db`를 지우지 않고 `fetch`만 다시 실행하면 raw는 누적되고, `clean`은 같은 URL을 `skip`으로 걸러 중복 저장 없음
+
+### 2-5. 테스트
+
+```bash
+python -m pytest -q          # 27개, API 키 불필요 (Mock 클라이언트)
+```
+
+### 2-6. 문제 해결
+
+| 증상 | 원인 · 조치 |
+| --- | --- |
+| `환경변수 GEMINI_API_KEY에 Gemini API 키가 설정되어 있지 않습니다` | `.env`가 `app/`에 없거나 값이 비어 있음 → 1-4 확인. `fetch`·`clean`·`report`·`export`·`list`·`show`는 키 없이 동작 |
+| `429 RESOURCE_EXHAUSTED` 경고 | 무료 티어 분당 15회 한도 → 프로그램이 안내된 시간만큼 대기 후 자동 재시도. 계속 나오면 `--limit`을 줄이거나 `ai.min_interval_seconds`를 6 이상으로 |
+| `404 NOT_FOUND ... model ... no longer available` | 모델 종료 → 오류 메시지가 안내하는 모델명으로 `config.json`의 `ai.model` 변경 |
+| `타임아웃` / `연결 실패` 경고 후 `수집 실패` | 네트워크 또는 BBC 응답 지연 → 재실행. 지속되면 `http.timeout`을 20으로 |
+| `본문 추출 실패(구조 불일치)` | BBC 기사 마크업 변경 → `config.json`의 `sources.crawl.body_selector`·`exclude_selectors` 조정 |
+| `조건에 맞는 clean 뉴스가 없습니다` / `summary가 존재하는 기사가 없어` | `analyze` 전에 `clean`·`summarize` 선행 필요 |
+| 차트 한글이 □로 표시 | 한글 폰트 미탐지 → `config.json`의 `report.font_family`에 설치된 폰트명 지정 (예: `"NanumGothic"`) |
+| Windows 콘솔 한글 깨짐 | `chcp 65001` 실행 후 재시도, 또는 `set PYTHONIOENCODING=utf-8` |
+| `알 수 없는 카테고리` | `--category` 값은 국내·세계·북한·건강·과학·문화·기타 중 하나 |
 
 ---
 
@@ -191,15 +346,7 @@ crontab -e
 
 ---
 
-## 6. 테스트
-
-```bash
-python -m pytest -q          # 27개: 정제 규칙 · 저장 정책 · 수집 파서 · 요약 흐름 · 분석/감성(Mock)
-```
-
----
-
-## 7. 디렉터리
+## 6. 디렉터리
 
 ```text
 app/
