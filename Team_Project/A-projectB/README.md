@@ -43,6 +43,7 @@ cd Codyssey/Team_Project/A-projectB/app
 ```
 
 - 이미 받은 저장소라면 `git pull origin develop` 후 `Team_Project/A-projectB/app`으로 이동
+- 이 README는 `A-projectB/`에 있고, 실행은 그 아래 **`app/`** 디렉터리에서
 
 ### 1-3. 가상환경과 의존성
 
@@ -125,7 +126,7 @@ python main.py export --format csv --status summarized
 python main.py export --format xlsx
 ```
 
-- 각 단계의 기대 출력은 §3 "실행 예시"와 `../제출물/실행 결과.md` 참고
+- 각 단계의 기대 출력은 §3 "실행 예시"와 `제출물/실행 결과.md` 참고
 - 진행 로그는 콘솔에 `[INFO]`/`[WARNING]`/`[ERROR]`로 출력되고 `logs/app.log`에도 기록
 
 ### 2-2. 단계별 자주 쓰는 옵션
@@ -263,7 +264,7 @@ $ python main.py analyze --category 세계 --date-from 2026-08-01 --date-to 2026
 ...
 ```
 
-- 전체 실행 로그와 산출물: `../제출물/실행 결과.md`
+- 전체 실행 로그와 산출물: `제출물/실행 결과.md`
 
 ---
 
@@ -349,14 +350,17 @@ crontab -e
 ## 6. 디렉터리
 
 ```text
-app/
-├── main.py  config.py  log.py  config.json  requirements.txt  .env.example
-├── collector/   http_client.py  rss.py  crawler.py  __init__.py(run_fetch)
-├── storage.py  cleaner.py  clean_service.py
-├── ai_client.py  summarizer.py  repository.py  insight_analyzer.py  sentiment_analyzer.py  models.py
-├── report/      charts.py  report.py  exporter.py
-├── tests/
-├── output/      report.md  report.txt  charts/*.png  exports/*.csv|jsonl|xlsx
-├── data/        news.db (gitignore)
-└── logs/        app.log (gitignore)
+A-projectB/
+├── README.md  과제 개요.md  수행 플랜.md
+├── 제출물/      실행 결과.md
+└── app/
+    ├── main.py  config.py  log.py  config.json  requirements.txt  .env.example
+    ├── collector/   http_client.py  rss.py  crawler.py  __init__.py(run_fetch)
+    ├── storage.py  cleaner.py  clean_service.py
+    ├── ai_client.py  summarizer.py  repository.py  insight_analyzer.py  sentiment_analyzer.py  models.py
+    ├── report/      charts.py  report.py  exporter.py
+    ├── tests/
+    ├── output/      report.md  report.txt  charts/*.png  exports/
+    ├── data/        news.db (gitignore)
+    └── logs/        app.log (gitignore)
 ```
