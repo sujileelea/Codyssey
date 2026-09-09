@@ -17,7 +17,7 @@ fetch ──▶ raw_news ──▶ clean ──▶ news ──▶ summarize ─�
 
 | 팀원 | 파트 | 모듈 |
 | --- | --- | --- |
-| **수지** (owner) | CLI · 설정 · 로깅 · 수집 · 리포트 · 내보내기 · 통합 | `main.py` `config.py` `log.py` `collector/` `report/` |
+| **수지** | CLI · 설정 · 로깅 · 수집 · 리포트 · 내보내기 · 통합 | `main.py` `config.py` `log.py` `collector/` `report/` |
 | **혜민** | 데이터 저장/정제 | `storage.py` `cleaner.py` `clean_service.py` |
 | **진성** | AI 요약 | `summarizer.py` |
 | **경학** | AI 인사이트 분석 · 감성 분석(보너스) | `ai_client.py` `repository.py` `insight_analyzer.py` `sentiment_analyzer.py` `models.py` |
