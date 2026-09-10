@@ -22,7 +22,7 @@ class HttpClient:
         self.session = requests.Session()
         self.session.headers.update(
             {
-                "User-Agent": http_config.get("user_agent", "A-projectB-news-cli/0.1"),
+                "User-Agent": http_config.get("user_agent", "codyssey-news-cli/0.1"),
                 "Accept-Language": "ko,en;q=0.8",
             }
         )

@@ -39,11 +39,11 @@ fetch ──▶ raw_news ──▶ clean ──▶ news ──▶ summarize ─�
 
 ```bash
 git clone -b develop https://github.com/sujileelea/Codyssey.git
-cd Codyssey/Team_Project/A-projectB/app
+cd Codyssey/Team_Project/활용과정-projectB/app
 ```
 
-- 이미 받은 저장소라면 `git pull origin develop` 후 `Team_Project/A-projectB/app`으로 이동
-- 이 README는 `A-projectB/`에 있고, 실행은 그 아래 **`app/`** 디렉터리에서
+- 이미 받은 저장소라면 `git pull origin develop` 후 `Team_Project/활용과정-projectB/app`으로 이동
+- 이 README는 `활용과정-projectB/`에 있고, 실행은 그 아래 **`app/`** 디렉터리에서
 
 ### 1-3. 가상환경과 의존성
 
@@ -332,12 +332,12 @@ crontab -e
 
 ```cron
 # m h dom mon dow  command
-0 8,18 * * *  cd /path/to/A-projectB/app && .venv/bin/python main.py fetch --limit 10 >> logs/cron.log 2>&1 \
+0 8,18 * * *  cd /path/to/활용과정-projectB/app && .venv/bin/python main.py fetch --limit 10 >> logs/cron.log 2>&1 \
   && .venv/bin/python main.py clean >> logs/cron.log 2>&1 \
   && .venv/bin/python main.py summarize --unsummarized --limit 20 >> logs/cron.log 2>&1 \
   && .venv/bin/python main.py sentiment --limit 20 >> logs/cron.log 2>&1 \
   && .venv/bin/python main.py report >> logs/cron.log 2>&1
-0 9 * * 1  cd /path/to/A-projectB/app && .venv/bin/python main.py analyze --date-from "$(date -v-7d +\%F)" --date-to "$(date +\%F)" >> logs/cron.log 2>&1
+0 9 * * 1  cd /path/to/활용과정-projectB/app && .venv/bin/python main.py analyze --date-from "$(date -v-7d +\%F)" --date-to "$(date +\%F)" >> logs/cron.log 2>&1
 ```
 
 - cron은 `.env`를 자동으로 읽지 않지만 `config.py`가 `app/.env`를 직접 읽으므로 그대로 동작 — 환경변수로 줄 경우 crontab 상단에 `GEMINI_API_KEY=...`
@@ -350,7 +350,7 @@ crontab -e
 ## 6. 디렉터리
 
 ```text
-A-projectB/
+활용과정-projectB/
 ├── README.md  과제 개요.md  수행 플랜.md
 ├── 제출물/      실행 결과.md
 └── app/

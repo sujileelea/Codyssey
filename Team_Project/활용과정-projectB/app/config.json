@@ -58,7 +58,7 @@
     "timeout": 10,
     "retries": 2,
     "delay_seconds": 1.5,
-    "user_agent": "A-projectB-news-cli/0.1 (Codyssey study project; contact: dev-team@sigongan.com)"
+    "user_agent": "codyssey-news-cli/0.1 (Codyssey study project; contact: dev-team@sigongan.com)"
   },
   "ai": {
     "provider": "gemini",
