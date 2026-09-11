@@ -63,3 +63,6 @@ tokens.json
 gcp-*.json
 .npmrc
 .pypirc
+
+# ===== AI_Application 미션1: 별도 git 저장소 (sujileelea/prompt-manager) =====
+AI_Application/mission1/prompt-manager/

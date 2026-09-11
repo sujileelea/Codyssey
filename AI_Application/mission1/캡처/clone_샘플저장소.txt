@@ -1,0 +1,23 @@
+$ git clone https://github.com/octocat/Hello-World.git
+
+$ ls -la
+drwxr-xr-x@  4 sujilee  wheel  128  9월 11 13:55 .
+drwx------@ 10 sujilee  wheel  320  9월 11 13:55 ..
+drwxr-xr-x@ 12 sujilee  wheel  384  9월 11 13:55 .git
+-rw-r--r--@  1 sujilee  wheel   13  9월 11 13:55 README
+
+$ git log --oneline -5
+7fd1a60 Merge pull request #6 from Spaceghost/patch-1
+7629413 New line at end of file. --Signed off by Spaceghost
+553c207 first commit
+
+$ git branch -a
+* master
+  remotes/origin/HEAD -> origin/master
+  remotes/origin/master
+  remotes/origin/octocat-patch-1
+  remotes/origin/test
+
+$ git remote -v
+origin	https://github.com/octocat/Hello-World.git (fetch)
+origin	https://github.com/octocat/Hello-World.git (push)
