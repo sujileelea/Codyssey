@@ -2,7 +2,7 @@
 
 - 사진을 올리고 **분야·콘텐츠 유형·이미지 유형·카테고리·톤** 다섯 축(프롬프트 매트릭스)을 고르면, 축별 프롬프트 블록을 합성해 AI(Gemini)가 스크린리더용 **대체텍스트(alt text)** 를 만들어 주는 웹 서비스
 - 프론트는 순수 HTML/CSS/JavaScript, 백엔드는 Vercel Serverless Functions(Python), 프레임워크 없음
-- Codyssey AI_Application 미션3 산출물 · **배포 URL: (Vercel 연결 후 기재)**
+- Codyssey AI_Application 미션3 산출물 · **배포 URL: <https://aitag-demo-gamma.vercel.app>** (Vercel 프로젝트 `aitag-demo`)
 
 ```text
 [브라우저]  사진 선택 → 캔버스 축소(1,600px) → base64
