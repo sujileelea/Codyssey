@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
+  <script defer src="/_vercel/insights/script.js"></script>
+  <title>프롬프트 매트릭스 — AITAG 시연</title>
+</head>
+<body>
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="index.html"><span class="logo" aria-hidden="true">Aa</span>AITAG 시연 <small>대체텍스트 생성</small></a>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav" aria-label="메뉴 열기">☰</button>
+      <nav class="nav" id="nav" aria-label="주요 메뉴">
+        <a href="index.html">홈</a>
+        <a href="demo.html">시연</a>
+        <a href="matrix.html">프롬프트 매트릭스</a>
+        <a href="faq.html">FAQ</a>
+      </nav>
+      <button class="theme-toggle" type="button" aria-label="다크 모드로 전환">🌙</button>
+    </div>
+  </header>
+  <main id="main" class="container">
+    <h1>프롬프트 매트릭스</h1>
+    <p class="lead">대체텍스트의 "좋은 기준"은 이미지가 쓰이는 자리마다 다릅니다. 매트릭스는 그 자리를 <strong>다섯 축</strong>으로 표현하고, 축마다 준비된 프롬프트 블록을 합성해 최종 프롬프트를 만듭니다. 조합은 수천 개지만 관리하는 블록은 수십 개입니다.</p>
+
+    <section class="section" aria-labelledby="h-axes">
+      <h2 id="h-axes">다섯 축 + 출력 옵션</h2>
+      <p>선택지는 서버의 <code>GET /api/options</code> 가 돌려주는 값 그대로입니다(프론트와 백엔드가 같은 정의를 씁니다).</p>
+      <div class="table-wrap"><table class="axis-table"><tbody id="axis-rows"><tr><td colspan="2">불러오는 중…</td></tr></tbody></table></div>
+    </section>
+
+    <section class="section" aria-labelledby="h-compose">
+      <h2 id="h-compose">합성 순서</h2>
+      <div class="flow">
+        <div class="step"><strong>공통 접근성 규칙</strong><span>보이는 것만 · 텍스트 원문 보존 · 장식 기호 금지 · 첫 문장에 핵심 · 장식 이미지 판정</span></div>
+        <div class="step"><strong>분야 블록</strong><span>쇼핑몰이면 구매 판단 정보, 언론사면 중립 서술과 추측 금지</span></div>
+        <div class="step"><strong>이미지 유형 · 카테고리 블록</strong><span>포스터면 제목→일시→장소 순, 식품이면 원재료·알레르기 보존</span></div>
+        <div class="step"><strong>톤 · 길이 · 언어 블록</strong><span>담백/격식/친근, 80·150·1,000자 기준, 한국어/영어</span></div>
+        <div class="step"><strong>출력 형식</strong><span>JSON 스키마를 강제해 alt_text·보충 설명·감지 텍스트·장식 여부를 항상 같은 모양으로 받습니다</span></div>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="h-examples">
+      <h2 id="h-examples">예시 조합 — 누르면 시연 페이지에 미리 설정됩니다</h2>
+      <div class="examples">
+        <article class="card" tabindex="0" role="link" data-preset="ecommerce.product.product_detail_image.food.plain"><h3>쇼핑몰 · 식품 상세 이미지</h3><p><span class="chip">ecommerce.product.product_detail_image.food.plain</span></p><p>라벨 문구·용량·원재료·알레르기 표시를 원문 그대로. 표는 문장으로 풀기.</p></article>
+        <article class="card" tabindex="0" role="link" data-preset="press.article.photo.sports.plain"><h3>언론사 · 스포츠 보도 사진</h3><p><span class="chip">press.article.photo.sports.plain</span></p><p>경기 상황·동작·유니폼만 중립 서술. 감정·신원 추측 금지.</p></article>
+        <article class="card" tabindex="0" role="link" data-preset="public.notice.poster.event.formal"><h3>공공기관 · 행사 포스터</h3><p><span class="chip">public.notice.poster.event.formal</span></p><p>행사명→기간→장소→대상→문의처를 빠짐없이 격식체로.</p></article>
+        <article class="card" tabindex="0" role="link" data-preset="education.lecture.infographic.general.friendly"><h3>교육 · 강의 인포그래픽</h3><p><span class="chip">education.lecture.infographic.general.friendly</span></p><p>제목·축·범례·수치와 추세를 친근한 문체로 설명.</p></article>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <div class="container">
+      <span>AITAG 시연 — 사진과 프롬프트 매트릭스로 대체텍스트를 만드는 데모</span>
+      <span>Vercel Serverless Functions(Python) + Gemini · 프론트는 순수 HTML/CSS/JS</span>
+    </div>
+  </footer>
+  <script src="js/common.js"></script>
+  <script src="js/matrix.js"></script>
+</body>
+</html>
