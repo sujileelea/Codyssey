@@ -61,7 +61,7 @@ LENGTHS = [
 ]
 
 LANGUAGES = [
-    ("ko", "한국어", "모든 출력은 한국어로 쓴다. 단위·약어는 스크린리더가 읽기 쉽도록 풀어 쓴다(예: 'ml' → '밀리리터')."),
+    ("ko", "한국어", "모든 출력은 한국어로 쓴다. 숫자는 아라비아 숫자 그대로 쓰고(예: 2026년, 78%), 단위 기호·영문 약어만 스크린리더가 읽기 쉽도록 풀어 쓴다(예: 'ml' → '밀리리터', '%' 는 그대로 두어도 된다)."),
     ("en", "English", "Write every field in natural English suitable for screen readers."),
 ]
 
