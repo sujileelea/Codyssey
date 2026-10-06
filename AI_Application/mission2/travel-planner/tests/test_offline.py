@@ -469,3 +469,102 @@ def test_old_raw_files_are_upgraded_on_load(tmp_path):
     item = report.load_raw(str(tmp_path / "old.json"))["recommendation"]["recommended_cities"][0]
     assert item == {"recommended_city": "제주", "weather": "w"}
 
+
+# --- 장소 검색 제공자 교체 · 검색어 정규화 -----------------------------------------------
+
+@pytest.mark.parametrize("city, keyword", [
+    ("제주", "제주"), ("강릉시", "강릉"), ("부산광역시", "부산"), ("서울특별시", "서울"), ("세종특별자치시", "세종"),
+    ("제주특별자치도", "제주"), ("경북 경주시", "경주"), ("강원도", "강릉"), ("전라남도", "여수"),
+    ("제주(서귀포)", "제주"), ("여수/순천", "여수"), ("양양군", "양양"), ("부산 해운대", "해운대"),
+])
+def test_normalize_city_for_search(city, keyword):
+    assert place_api.normalize_city(city) == keyword
+
+
+def test_search_logs_keyword_correction(monkeypatch):
+    sent = []
+    monkeypatch.setattr(place_api.requests, "get",
+                        lambda *a, **k: sent.append(k["params"]) or FakeResponse(200, {"documents": [{"place_name": "A"}]}))
+    notes = []
+    place_api.search_restaurants("강원도", 5, ErrorLog(), log=notes.append)
+    assert sent[0]["query"] == "강릉 맛집" and "검색어 보정" in notes[0]
+
+
+def test_naver_provider_same_output_shape(monkeypatch):
+    monkeypatch.setattr(config, "PLACE_PROVIDER", "naver")
+    monkeypatch.setattr(config, "NAVER_CLIENT_ID", "id")
+    monkeypatch.setattr(config, "NAVER_CLIENT_SECRET", "secret")
+    item = {"title": "<b>제주</b> 고기국수", "link": "https://example.com", "category": "한식>국수",
+            "telephone": "", "address": "제주시 지번", "roadAddress": "제주시 도로 1",
+            "mapx": "1265312345", "mapy": "334987654"}
+    calls = []
+    monkeypatch.setattr(place_api.requests, "get",
+                        lambda url, **k: calls.append((url, k)) or FakeResponse(200, {"items": [item]}))
+    places = place_api.search_restaurants("제주", 9, ErrorLog(), log=lambda *_: None)
+    url, kwargs = calls[0]
+    assert url.startswith("https://openapi.naver.com/") and kwargs["headers"]["X-Naver-Client-Id"] == "id"
+    assert kwargs["params"]["display"] == 5                    # 네이버 상한 5
+    assert places == [{"name": "제주 고기국수", "address": "제주시 도로 1", "category": "한식 > 국수",
+                       "url": "https://example.com", "x": 126.5312345, "y": 33.4987654, "phone": ""}]
+    assert place_api.search_url("제주").startswith("https://map.naver.com/")
+
+
+def test_naver_auth_hint_differs_from_kakao(monkeypatch):
+    monkeypatch.setattr(config, "PLACE_PROVIDER", "naver")
+    monkeypatch.setattr(place_api.requests, "get", lambda *a, **k: FakeResponse(401, {}))
+    notes = []
+    place_api.search_restaurants("제주", 5, ErrorLog(), log=notes.append)
+    assert "X-Naver-Client-Id" in notes[0]
+
+
+def test_count_limit_follows_provider(monkeypatch):
+    monkeypatch.setattr(config, "PLACE_PROVIDER", "naver")
+    with pytest.raises(SystemExit):
+        travel_planner.build_parser().parse_args(["-date", "2026-10-03", "--count", "6"])
+
+
+def test_require_keys_follows_provider(monkeypatch, capsys):
+    monkeypatch.setattr(config, "PLACE_PROVIDER", "naver")
+    monkeypatch.setattr(config, "NAVER_CLIENT_ID", "")
+    monkeypatch.setattr(config, "NAVER_CLIENT_SECRET", "")
+    with pytest.raises(SystemExit) as exc:
+        config.require_keys()
+    assert exc.value.code == 1
+    assert "NAVER_CLIENT_ID, NAVER_CLIENT_SECRET" in capsys.readouterr().err
+
+
+def test_require_keys_rejects_unknown_provider(monkeypatch, capsys):
+    monkeypatch.setattr(config, "PLACE_PROVIDER", "google")
+    with pytest.raises(SystemExit):
+        config.require_keys()
+    assert "PLACE_PROVIDER" in capsys.readouterr().err
+
+
+def test_key_guide_says_env_exists_but_empty(monkeypatch, tmp_path, capsys):
+    env = tmp_path / ".env"
+    env.write_text("GEMINI_API_KEY=\n", encoding="utf-8")
+    monkeypatch.setattr(config, "ENV_FILE", str(env))
+    monkeypatch.setattr(config, "GEMINI_API_KEY", "")
+    with pytest.raises(SystemExit):
+        config.require_keys()
+    err = capsys.readouterr().err
+    assert "값이 비어 있습니다" in err and "cp -n" in err
+
+
+def test_empty_city_gets_map_search_link_in_fallback(monkeypatch, tmp_path):
+    stub_pipeline(monkeypatch, lambda: FakeResponse(200, {"documents": []}))
+    monkeypatch.setattr(llm_api, "write_report",
+                        lambda *a, **k: (_ for _ in ()).throw(llm_api.LLMError("HTTP_ERROR", "down")))
+    travel_planner.run(make_args())
+    md = open(tmp_path / "2026-10-03_travel_plan.md", encoding="utf-8").read()
+    assert "직접 찾기: [지도에서 '제주 맛집' 검색](https://map.kakao.com/?q=" in md
+
+
+def test_report_prompt_carries_search_links(monkeypatch):
+    sent = []
+    monkeypatch.setattr(llm_api.requests, "post",
+                        lambda *a, **k: sent.append(k["json"]) or gemini_text(good_report(no_places=True)))
+    rec = {"recommended_cities": [{"recommended_city": "제주"}, {"recommended_city": "강릉"}]}
+    llm_api.write_report("2026-10-03", rec, {"제주": [{"name": "A"}], "강릉": []}, {"강릉": "https://map.kakao.com/?q=x"})
+    assert "https://map.kakao.com/?q=x" in sent[0]["contents"][0]["parts"][0]["text"]
+

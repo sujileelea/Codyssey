@@ -30,13 +30,14 @@ def valid_date(text):
 
 
 def valid_count(text):
-    """argparse 타입 검사 — 지역당 맛집 수는 1~15 (Kakao 검색 size 상한)."""
+    """argparse 타입 검사 — 지역당 맛집 수는 1~제공자 상한 (Kakao 15 · Naver 5)."""
     try:
         value = int(text)
     except ValueError:
         value = 0
-    if not 1 <= value <= place_api.MAX_SIZE:
-        raise argparse.ArgumentTypeError(f"맛집 수는 1~{place_api.MAX_SIZE} 사이 정수여야 합니다: '{text}'")
+    limit = place_api.max_size()
+    if not 1 <= value <= limit:
+        raise argparse.ArgumentTypeError(f"맛집 수는 1~{limit} 사이 정수여야 합니다: '{text}' ({place_api.label()} 상한)")
     return value
 
 
@@ -50,7 +51,7 @@ def build_parser():
     parser.add_argument("--cities", type=int, default=3, choices=[1, 2, 3],
                         help="추천 지역 수 (기본 3, 보너스: 복수 지역)")
     parser.add_argument("--count", type=valid_count, default=5,
-                        help=f"지역당 맛집 검색 수 1~{place_api.MAX_SIZE} (기본 5)")
+                        help="지역당 맛집 검색 수 (기본 5, Kakao 1~15 · Naver 1~5)")
     parser.add_argument("--no-cache", action="store_true",
                         help="같은 날짜의 저장된 원본 JSON 이 있어도 API 를 다시 호출한다")
     return parser

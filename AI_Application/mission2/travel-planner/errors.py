@@ -18,7 +18,8 @@ IO_ERROR = "IO_ERROR"            # 결과 파일 저장 실패
 
 # 오류 유형별 다음 행동 안내 — CLI 요약과 웹 화면이 같이 쓴다
 HINTS = {
-    AUTH_ERROR: "키 값·권한을 확인하세요 (Kakao: REST API 키·카카오맵 활성화 / Gemini: AI Studio 키)",
+    AUTH_ERROR: "키 값·권한을 확인하세요 (Kakao: REST API 키·카카오맵 활성화 / Naver: Client ID·Secret·검색 API "
+                "사용 설정 / Gemini: AI Studio 키)",
     QUOTA_ERROR: "호출 한도를 넘었습니다 — 잠시 뒤 다시 실행하세요",
     NETWORK_ERROR: "인터넷 연결을 확인한 뒤 다시 실행하세요",
     HTTP_ERROR: "서비스 쪽 일시 오류일 수 있습니다 — 잠시 뒤 다시 실행하세요",

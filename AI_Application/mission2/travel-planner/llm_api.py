@@ -246,7 +246,7 @@ def check_report(markdown, date, recommendation, places_by_city):
         raise ValueError("리포트 필수 항목 누락: " + ", ".join(missing))
 
 
-def write_report(date, recommendation, places_by_city, log=None):
+def write_report(date, recommendation, places_by_city, search_links=None, log=None):
     """최종 여행 리포트(Markdown)를 생성한다. 필수 항목이 빠지면 PARSE_ERROR 로 실패시킨다.
 
     실패하면 호출한 쪽이 데이터만으로 만든 대체 리포트를 쓴다.
@@ -255,6 +255,7 @@ def write_report(date, recommendation, places_by_city, log=None):
         "date": date,
         "recommendation": recommendation,
         "places_by_city": places_by_city,
+        "map_search_links": search_links or {},
     }
     prompt = f"""아래 JSON 데이터만 근거로 {date} 국내 여행 추천 리포트를 Markdown 으로 작성하세요.
 
@@ -264,7 +265,9 @@ def write_report(date, recommendation, places_by_city, log=None):
 - 이어서 `## 1. 지역명`, `## 2. 지역명` 처럼 지역별로 나누고, 각 지역 아래에 다음 소제목을 모두 둡니다:
   `### 추천 이유` (2~3문장 요약) · `### 날씨 요약` · `### 행사/축제` (목록) · `### 맛집 추천` · `### 1일 일정 제안` (오전/오후/저녁)
 - 맛집은 데이터에 있는 것만 이름·주소·카테고리·링크로 목록화합니다. 데이터에 없는 맛집을 지어내지 마세요.
-- 맛집 목록이 비어 있으면 `- {NO_PLACES}` 한 줄만 씁니다.
+- 맛집 목록이 비어 있으면 `- {NO_PLACES}` 를 쓰고, 다음 줄에 map_search_links 의 그 지역 링크로
+  `- 직접 찾기: [지도에서 '<지역> 맛집' 검색](링크)` 를 씁니다. 그 지역의 1일 일정 식사는 특정 상호 없이
+  지역 대표 음식 위주로 제안합니다.
 - 1일 일정 제안에는 맛집이 있으면 그중 1~2곳을 식사 시간에 넣습니다.
 - 오류 요약 섹션은 프로그램이 따로 붙이므로 쓰지 않습니다. 코드 펜스 없이 Markdown 본문만 출력합니다.
 

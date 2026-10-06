@@ -63,7 +63,7 @@ def _places_lines(places):
     return lines
 
 
-def fallback_report(date, recommendation, places_by_city):
+def fallback_report(date, recommendation, places_by_city, search_links=None):
     """LLM 리포트 생성이 실패했을 때 데이터만으로 만드는 리포트 (과제 필수 항목은 모두 포함)."""
     cities = recommendation["recommended_cities"]
     lines = [f"# {date} 국내 여행 추천 리포트", "",
@@ -81,6 +81,8 @@ def fallback_report(date, recommendation, places_by_city):
         lines += [f"- {e}" for e in city["events"]] or ["- 데이터 없음"]
         lines += ["", "### 맛집 추천", ""]
         lines += _places_lines(places)
+        if not places and (search_links or {}).get(name):
+            lines.append(f"- 직접 찾기: [지도에서 '{name} 맛집' 검색]({search_links[name]})")
         event = city["events"][0] if city["events"] else "지역 명소"
         lunch = f"{places[0]['name']}에서 점심" if places else "현지 식당에서 점심(맛집 데이터 없음)"
         dinner = f"{places[1]['name']}에서 저녁" if len(places) > 1 else "숙소 근처에서 저녁"

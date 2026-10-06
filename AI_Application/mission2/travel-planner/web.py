@@ -193,7 +193,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, {
                     "model": config.GEMINI_MODEL,
                     "defaults": DEFAULTS,
-                    "max_count": place_api.MAX_SIZE,
+                    "max_count": place_api.max_size(),
+                    "place_provider": place_api.label(),
                     # JavaScript 키는 브라우저용 공개 키(등록한 도메인에서만 동작). REST·Gemini 키는 절대 내보내지 않는다
                     "kakao_js_key": config.KAKAO_JS_KEY or None,
                 })

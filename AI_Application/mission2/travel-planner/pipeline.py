@@ -96,13 +96,13 @@ def run(date, cities=3, count=5, use_cache=True, emit=print_event):
             log(1, "info", f'recommended_city: "{c["recommended_city"]}"')
 
         # [2/3] 지역별 맛집 검색 — 실패·0건이어도 계속 진행
-        step(2, "맛집 검색 중(Kakao Local)...")
+        step(2, f"맛집 검색 중({place_api.label()})...")
         places_by_city = {}
         stop = None   # 인증·쿼터 실패면 같은 키로 나머지 지역도 실패하므로 호출을 멈춘다
         for c in recommendation["recommended_cities"]:
             city = c["recommended_city"]
             if stop:
-                errors.add(place_api.STEP, stop, f"앞 지역의 {stop} 로 검색 생략 (query={city} 맛집)")
+                errors.add(place_api.STEP, stop, f"앞 지역의 {stop} 로 검색 생략 (query={place_api.query_for(city)})")
                 log(2, "warn", f"{city}: 앞 지역에서 {stop} — 같은 키라 검색을 건너뜁니다 (데이터 없음)")
                 places_by_city[city] = []
                 continue
@@ -118,15 +118,18 @@ def run(date, cities=3, count=5, use_cache=True, emit=print_event):
         save(report.save_raw, raw_file, _raw(date, cities, count, recommendation, places_by_city, errors), 2)
 
     # [3/3] LLM 최종 리포트 — 실패하면 데이터만으로 대체 리포트를 만든다
+    # 맛집 0건 지역에는 지도에서 직접 찾아볼 수 있는 검색 링크를 리포트에 넣는다
+    search_links = {city: place_api.search_url(city) for city, places in places_by_city.items() if not places}
     step(3, "최종 리포트 생성 중(LLM)...")
     try:
-        markdown = llm_api.write_report(date, recommendation, places_by_city, log=lambda t: log(3, "warn", t))
+        markdown = llm_api.write_report(date, recommendation, places_by_city, search_links,
+                                        log=lambda t: log(3, "warn", t))
         log(3, "info", "리포트 생성 완료")
     except llm_api.LLMError as exc:
         errors.add("report", exc.error_type, str(exc))
         log(3, "warn", f"오류: {exc.error_type} — {exc}")
         log(3, "warn", "데이터만으로 대체 리포트를 생성합니다")
-        markdown = report.fallback_report(date, recommendation, places_by_city)
+        markdown = report.fallback_report(date, recommendation, places_by_city, search_links)
     markdown = markdown.rstrip() + "\n\n" + report.errors_section(errors)
     report_saved = save(report.save_report, report_file, markdown, 3)
     # 리포트 단계 오류까지 포함해 원본 JSON 의 errors 를 최종 상태로 갱신
@@ -184,7 +187,7 @@ def _raw(date, cities, count, recommendation, places_by_city, errors):
         "date": date,
         "generated_at": datetime.now(KST).isoformat(timespec="seconds"),
         "llm_model": config.GEMINI_MODEL,
-        "place_provider": "kakao_local_keyword",
+        "place_provider": place_api.provider().NAME,
         "options": {"cities": cities, "count": count},
         "recommendation": recommendation,
         "places": places_by_city,
