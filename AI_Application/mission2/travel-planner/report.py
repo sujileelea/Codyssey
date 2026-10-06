@@ -37,9 +37,12 @@ def errors_section(errors):
     return "\n".join(lines)
 
 
+NO_PLACES = "데이터 없음 (장소 검색 결과 0건)"
+
+
 def _places_lines(places):
     if not places:
-        return ["- 데이터 없음 (장소 검색 결과 0건)"]
+        return [f"- {NO_PLACES}"]
     lines = []
     for p in places:
         title = f"[{p['name']}]({p['url']})" if p.get("url") else p["name"]
@@ -49,18 +52,28 @@ def _places_lines(places):
 
 
 def fallback_report(date, recommendation, places_by_city):
-    """LLM 리포트 생성이 실패했을 때 데이터만으로 만드는 리포트."""
+    """LLM 리포트 생성이 실패했을 때 데이터만으로 만드는 리포트 (과제 필수 항목은 모두 포함)."""
+    cities = recommendation["recommended_cities"]
     lines = [f"# {date} 국내 여행 추천 리포트", "",
-             "> LLM 리포트 생성에 실패해 수집 데이터로만 구성한 리포트입니다.", ""]
-    for i, city in enumerate(recommendation["recommended_cities"], start=1):
+             "> LLM 리포트 생성에 실패해 수집 데이터로만 구성한 리포트입니다.", "",
+             "## 추천 지역", ""]
+    lines += [f"- {c['city']}" + (" (대표 추천)" if i == 0 else "") for i, c in enumerate(cities)]
+    lines.append("")
+    for i, city in enumerate(cities, start=1):
         name = city["city"]
+        places = places_by_city.get(name, [])
         lines += [f"## {i}. {name}", "",
                   "### 추천 이유", "", city["reason"], "",
                   "### 날씨 요약", "", city["weather"], "",
                   "### 행사/축제", ""]
         lines += [f"- {e}" for e in city["events"]] or ["- 데이터 없음"]
         lines += ["", "### 맛집 추천", ""]
-        lines += _places_lines(places_by_city.get(name, []))
+        lines += _places_lines(places)
+        event = city["events"][0] if city["events"] else "지역 명소"
+        lunch = f"{places[0]['name']}에서 점심" if places else "현지 식당에서 점심(맛집 데이터 없음)"
+        dinner = f"{places[1]['name']}에서 저녁" if len(places) > 1 else "숙소 근처에서 저녁"
         lines += ["", "### 1일 일정 제안", "",
-                  f"- 오전: {name} 대표 명소 산책", "- 오후: 행사/축제 방문", "- 저녁: 맛집에서 식사", ""]
+                  f"- 오전: {name} 대표 명소 산책, {lunch}",
+                  f"- 오후: {event} 방문",
+                  f"- 저녁: {dinner}", ""]
     return "\n".join(lines)

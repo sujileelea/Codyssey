@@ -41,6 +41,16 @@ GOOD_RECOMMENDATION = {"recommended_cities": [
 ]}
 
 
+def good_report(date="2026-10-03", cities=("제주", "강릉"), no_places=False):
+    """check_report 를 통과하는 최소 리포트."""
+    lines = [f"# {date} 국내 여행 추천 리포트", "", "## 추천 지역"] + [f"- {c} — 요약" for c in cities]
+    for i, c in enumerate(cities, start=1):
+        lines += [f"## {i}. {c}"] + [f"### {s}\n- 내용" for s in llm_api.REPORT_SECTIONS]
+    if no_places:
+        lines.append("- 데이터 없음 (장소 검색 결과 0건)")
+    return "\n".join(lines)
+
+
 @pytest.fixture(autouse=True)
 def keys(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "GEMINI_API_KEY", "test")
@@ -191,7 +201,7 @@ def test_pipeline_uses_cache_on_rerun(monkeypatch, tmp_path):
     def post(*a, **k):
         calls["post"] += 1
         is_json_mode = "responseSchema" in k["json"]["generationConfig"]
-        return gemini_text(json.dumps(GOOD_RECOMMENDATION, ensure_ascii=False) if is_json_mode else "# 리포트")
+        return gemini_text(json.dumps(GOOD_RECOMMENDATION, ensure_ascii=False) if is_json_mode else good_report())
 
     def get(*a, **k):
         calls["get"] += 1
@@ -214,3 +224,50 @@ def test_failed_recommendation_is_not_reused_as_cache(monkeypatch, tmp_path):
     assert travel_planner.run(make_args()) == 1
     assert json.load(open(tmp_path / "2026-10-03_raw.json", encoding="utf-8"))["recommendation"] is None
     assert travel_planner.run(make_args()) == 1   # 캐시로 쓰지 않고 다시 호출 → 여전히 실패
+
+
+# --- LLM 응답 · 리포트 검증 ------------------------------------------------------
+
+def test_gemini_prompt_block_is_llm_error(monkeypatch):
+    monkeypatch.setattr(llm_api.requests, "post",
+                        lambda *a, **k: FakeResponse(200, {"promptFeedback": {"blockReason": "SAFETY"}}))
+    with pytest.raises(llm_api.LLMError) as exc:
+        llm_api.recommend("2026-10-03", 1, ErrorLog(), log=lambda *_: None)
+    assert exc.value.error_type == "LLM_ERROR" and "SAFETY" in str(exc.value)
+
+
+def test_gemini_skips_thought_parts(monkeypatch):
+    body = {"candidates": [{"finishReason": "STOP", "content": {"parts": [
+        {"text": "생각 중...", "thought": True},
+        {"text": json.dumps(GOOD_RECOMMENDATION, ensure_ascii=False)}]}}]}
+    monkeypatch.setattr(llm_api.requests, "post", lambda *a, **k: FakeResponse(200, body))
+    assert llm_api.recommend("2026-10-03", 1, ErrorLog(), log=lambda *_: None)["recommended_city"] == "제주"
+
+
+def test_report_missing_sections_falls_back(monkeypatch, tmp_path):
+    posts = iter([gemini_text(json.dumps(GOOD_RECOMMENDATION, ensure_ascii=False)), gemini_text("# 아무 리포트")])
+    monkeypatch.setattr(llm_api.requests, "post", lambda *a, **k: next(posts))
+    monkeypatch.setattr(place_api.requests, "get",
+                        lambda *a, **k: FakeResponse(200, {"documents": [{"place_name": "A식당", "address_name": "주소"}]}))
+    assert travel_planner.run(make_args()) == 0
+    md = open(tmp_path / "2026-10-03_travel_plan.md", encoding="utf-8").read()
+    raw = json.load(open(tmp_path / "2026-10-03_raw.json", encoding="utf-8"))
+    assert "수집 데이터로만 구성한 리포트" in md and "## 추천 지역" in md and "A식당에서 점심" in md
+    assert raw["errors"][0]["step"] == "report" and raw["errors"][0]["type"] == PARSE_ERROR
+    assert "필수 항목 누락" in raw["errors"][0]["message"]
+
+
+def test_check_report_requires_no_data_mark_for_empty_city():
+    rec = {"recommended_cities": [{"city": "제주"}, {"city": "강릉"}]}
+    places = {"제주": [{"name": "A"}], "강릉": []}
+    with pytest.raises(ValueError, match="데이터 없음"):
+        llm_api.check_report(good_report(), "2026-10-03", rec, places)
+    llm_api.check_report(good_report(no_places=True), "2026-10-03", rec, places)
+
+
+def test_report_drops_llm_written_errors_section(monkeypatch):
+    text = good_report() + "\n\n## 오류 요약(errors)\n- 지어낸 오류"
+    monkeypatch.setattr(llm_api.requests, "post", lambda *a, **k: gemini_text(text))
+    rec = {"recommended_cities": [{"city": "제주"}, {"city": "강릉"}]}
+    md = llm_api.write_report("2026-10-03", rec, {"제주": [{"name": "A"}], "강릉": [{"name": "B"}]})
+    assert "오류 요약" not in md

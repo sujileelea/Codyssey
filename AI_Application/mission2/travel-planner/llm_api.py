@@ -12,6 +12,7 @@ import requests
 
 import config
 from errors import AUTH_ERROR, LLM_ERROR, PARSE_ERROR, classify_exception, classify_http
+from report import NO_PLACES
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
@@ -92,10 +93,30 @@ def _generate(prompt, response_schema=None, temperature=0.7):
 
     try:
         data = response.json()
-        return data["candidates"][0]["content"]["parts"][0]["text"]
-    except (ValueError, KeyError, IndexError, TypeError) as exc:
-        # 안전 필터 차단 등으로 candidates 가 비어 있을 수 있다
-        raise LLMError(LLM_ERROR, f"응답에 텍스트가 없음: {response.text[:200]}") from exc
+    except ValueError as exc:
+        raise LLMError(LLM_ERROR, f"응답 본문이 JSON 이 아님: {response.text[:200]}") from exc
+    return _extract_text(data)
+
+
+def _extract_text(data):
+    """generateContent 응답에서 본문 텍스트를 꺼낸다. 차단·빈 응답은 LLMError."""
+    if not isinstance(data, dict):
+        raise LLMError(LLM_ERROR, "응답 형식이 객체가 아님")
+    blocked = (data.get("promptFeedback") or {}).get("blockReason")
+    if blocked:
+        raise LLMError(LLM_ERROR, f"프롬프트가 안전 필터에 차단됨({blocked})")
+    candidates = data.get("candidates") or []
+    if not candidates or not isinstance(candidates[0], dict):
+        raise LLMError(LLM_ERROR, "응답 후보(candidates)가 없음")
+    candidate = candidates[0]
+    finish = candidate.get("finishReason", "STOP")
+    parts = (candidate.get("content") or {}).get("parts") or []
+    # 사고(thought) 파트는 빼고 본문 텍스트만 잇는다
+    text = "".join(p.get("text", "") for p in parts if isinstance(p, dict) and not p.get("thought"))
+    if not text.strip():
+        raise LLMError(LLM_ERROR, f"응답에 텍스트가 없음(finishReason={finish})")
+    # MAX_TOKENS 로 잘린 텍스트는 그대로 넘기고, 뒤의 JSON 파싱·섹션 검사가 잡는다
+    return text
 
 
 def parse_json_text(text):
@@ -179,8 +200,34 @@ def recommend(date, city_count, errors, log):
     raise LLMError(PARSE_ERROR, f"1차 추천 JSON 파싱 2회 실패 — {last_error}")
 
 
+REPORT_SECTIONS = ("추천 이유", "날씨 요약", "행사/축제", "맛집 추천", "1일 일정 제안")
+
+def check_report(markdown, date, recommendation, places_by_city):
+    """LLM 리포트가 과제 필수 항목을 다 갖췄는지 검사한다. 빠진 것이 있으면 ValueError."""
+    cities = [c["city"] for c in recommendation["recommended_cities"]]
+    missing = []
+    if not markdown.startswith(f"# {date} 국내 여행 추천 리포트"):
+        missing.append("제목")
+    if not re.search(r"^##\s*추천 지역", markdown, re.MULTILINE):
+        missing.append("추천 지역")
+    for city in cities:
+        if not re.search(rf"^##\s*(\d+\.\s*)?{re.escape(city)}", markdown, re.MULTILINE):
+            missing.append(f"{city} 섹션")
+    for section in REPORT_SECTIONS:
+        found = len(re.findall(rf"^###\s*{re.escape(section)}", markdown, re.MULTILINE))
+        if found < len(cities):
+            missing.append(f"{section}({found}/{len(cities)})")
+    if any(not places_by_city.get(city) for city in cities) and "데이터 없음" not in markdown:
+        missing.append("맛집 0건 지역의 '데이터 없음' 표기")
+    if missing:
+        raise ValueError("리포트 필수 항목 누락: " + ", ".join(missing))
+
+
 def write_report(date, recommendation, places_by_city):
-    """최종 여행 리포트(Markdown)를 생성한다. 맛집 0건인 도시는 '데이터 없음'으로 표기하게 한다."""
+    """최종 여행 리포트(Markdown)를 생성한다. 필수 항목이 빠지면 PARSE_ERROR 로 실패시킨다.
+
+    실패하면 호출한 쪽이 데이터만으로 만든 대체 리포트를 쓴다.
+    """
     payload = {
         "date": date,
         "recommendation": recommendation,
@@ -190,10 +237,11 @@ def write_report(date, recommendation, places_by_city):
 
 규칙:
 - 첫 줄은 정확히 `# {date} 국내 여행 추천 리포트`
-- 지역이 여러 개면 `## 1. 지역명`, `## 2. 지역명` 처럼 지역별로 나누고, 각 지역 아래에 다음 소제목을 모두 둡니다:
+- 그다음 `## 추천 지역` 섹션에 지역마다 `- 지역명 — 한 줄 요약` 을 씁니다 (첫 번째가 대표 추천)
+- 이어서 `## 1. 지역명`, `## 2. 지역명` 처럼 지역별로 나누고, 각 지역 아래에 다음 소제목을 모두 둡니다:
   `### 추천 이유` (2~3문장 요약) · `### 날씨 요약` · `### 행사/축제` (목록) · `### 맛집 추천` · `### 1일 일정 제안` (오전/오후/저녁)
 - 맛집은 데이터에 있는 것만 이름·주소·카테고리·링크로 목록화합니다. 데이터에 없는 맛집을 지어내지 마세요.
-- 맛집 목록이 비어 있으면 `- 데이터 없음 (장소 검색 결과 0건)` 한 줄만 씁니다.
+- 맛집 목록이 비어 있으면 `- {NO_PLACES}` 한 줄만 씁니다.
 - 1일 일정 제안에는 맛집이 있으면 그중 1~2곳을 식사 시간에 넣습니다.
 - 오류 요약 섹션은 프로그램이 따로 붙이므로 쓰지 않습니다. 코드 펜스 없이 Markdown 본문만 출력합니다.
 
@@ -201,4 +249,11 @@ def write_report(date, recommendation, places_by_city):
 {json.dumps(payload, ensure_ascii=False, indent=2)}"""
     text = _generate(prompt, temperature=0.6).strip()
     fenced = re.fullmatch(r"```(?:markdown|md)?\s*(.*?)```", text, re.DOTALL)
-    return fenced.group(1).strip() if fenced else text
+    markdown = fenced.group(1).strip() if fenced else text
+    # 오류 요약은 프로그램이 붙이므로, LLM 이 지시를 어기고 썼다면 잘라 낸다
+    markdown = re.split(r"^##\s*오류 요약", markdown, maxsplit=1, flags=re.MULTILINE)[0].rstrip()
+    try:
+        check_report(markdown, date, recommendation, places_by_city)
+    except ValueError as exc:
+        raise LLMError(PARSE_ERROR, str(exc)) from exc
+    return markdown
