@@ -324,3 +324,54 @@ def test_kakao_connection_error_recovers_on_retry(monkeypatch):
     errors = ErrorLog()
     assert len(place_api.search_restaurants("제주", 5, errors, log=lambda *_: None)) == 1
     assert len(calls) == 2 and not errors.items
+
+
+# --- 캐시 조건 -----------------------------------------------------------------
+
+def stub_pipeline(monkeypatch, kakao):
+    """1차 추천·리포트는 성공, Kakao 응답은 kakao() 로 정한다. 호출 수를 센다."""
+    calls = {"post": 0, "get": 0}
+
+    def post(*a, **k):
+        calls["post"] += 1
+        is_json_mode = "responseSchema" in k["json"]["generationConfig"]
+        return gemini_text(json.dumps(GOOD_RECOMMENDATION, ensure_ascii=False) if is_json_mode
+                           else good_report(no_places=True))
+
+    def get(*a, **k):
+        calls["get"] += 1
+        return kakao()
+
+    monkeypatch.setattr(llm_api.requests, "post", post)
+    monkeypatch.setattr(place_api.requests, "get", get)
+    return calls
+
+
+def test_place_search_failure_is_not_reused_as_cache(monkeypatch, tmp_path, capsys):
+    replies = iter([FakeResponse(401, {})] * 2 + [FakeResponse(200, {"documents": [{"place_name": "A"}]})] * 2)
+    calls = stub_pipeline(monkeypatch, lambda: next(replies))
+    assert travel_planner.run(make_args()) == 0                 # 잘못된 키 → 맛집 데이터 없음
+    assert travel_planner.run(make_args()) == 0                 # 키를 고친 뒤 → 캐시 대신 다시 검색
+    assert calls["get"] == 4
+    assert "맛집 검색 오류(AUTH_ERROR)" in capsys.readouterr().out
+    raw = json.load(open(tmp_path / "2026-10-03_raw.json", encoding="utf-8"))
+    assert raw["errors"] == [] and raw["places"]["제주"][0]["name"] == "A"
+
+
+def test_cache_requires_same_options(monkeypatch, tmp_path):
+    calls = stub_pipeline(monkeypatch, lambda: FakeResponse(200, {"documents": [{"place_name": "A"}]}))
+    assert travel_planner.run(make_args(cities=2)) == 0
+    raw = json.load(open(tmp_path / "2026-10-03_raw.json", encoding="utf-8"))
+    assert raw["options"] == {"cities": 2, "count": 5}
+    assert travel_planner.run(make_args(cities=2)) == 0          # 같은 옵션 → 캐시
+    assert calls["post"] == 3
+    assert travel_planner.run(make_args(cities=1)) == 0          # 지역 수 다름 → 다시 호출
+    assert travel_planner.run(make_args(cities=1, count=3)) == 0  # 맛집 수 다름 → 다시 호출
+    assert calls["post"] == 7
+
+
+def test_corrupt_cache_is_ignored(monkeypatch, tmp_path, capsys):
+    (tmp_path / "2026-10-03_raw.json").write_text("{깨진 JSON", encoding="utf-8")
+    stub_pipeline(monkeypatch, lambda: FakeResponse(200, {"documents": [{"place_name": "A"}]}))
+    assert travel_planner.run(make_args()) == 0
+    assert "읽기 실패" in capsys.readouterr().out

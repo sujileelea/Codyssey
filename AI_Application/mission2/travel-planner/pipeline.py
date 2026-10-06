@@ -16,7 +16,7 @@ import config
 import llm_api
 import place_api
 import report
-from errors import ErrorLog
+from errors import EMPTY_RESULT, ErrorLog
 
 KST = timezone(timedelta(hours=9))
 TOTAL_STEPS = 3
@@ -52,7 +52,7 @@ def run(date, cities=3, count=5, use_cache=True, emit=print_event):
         emit({"kind": "notice", "level": level, "text": text})
 
     # 보너스: 캐싱 — 같은 날짜의 원본 JSON 이 있으면 [1/3]·[2/3] API 호출을 건너뛴다
-    cached = _load_cache(raw_file, notice) if use_cache else None
+    cached = _load_cache(raw_file, notice, cities, count) if use_cache else None
 
     if cached:
         recommendation = cached["recommendation"]
@@ -112,19 +112,44 @@ def run(date, cities=3, count=5, use_cache=True, emit=print_event):
     return _result(True, date, raw_file, report_file, raw, markdown, cached=bool(cached))
 
 
-def _load_cache(raw_file, notice):
+def _load_cache(raw_file, notice, cities, count):
     """캐시로 쓸 수 있는 원본 JSON 이면 dict, 아니면 None."""
     if not os.path.exists(raw_file):
         return None
     try:
         cached = report.load_raw(raw_file)
-        if not cached.get("recommendation"):
-            return None   # 이전 실행이 1차 추천에서 실패한 기록 — 캐시로 쓰지 않는다
-    except (OSError, ValueError, AttributeError) as exc:
-        notice("warn", f"[캐시] 읽기 실패({exc}) — API 를 다시 호출합니다")
+        reason = _cache_miss_reason(cached, cities, count)
+    except (OSError, ValueError, AttributeError, KeyError, TypeError) as exc:
+        reason = f"읽기 실패({type(exc).__name__}: {exc})"
+    if reason:
+        notice("info", f"[캐시] {display_path(raw_file)} 를 쓰지 않습니다 — {reason}. API 를 다시 호출합니다")
         return None
     notice("info", f"[캐시] {display_path(raw_file)} 발견 — 1차 추천·맛집 검색 API 호출을 건너뜁니다 (--no-cache 로 재호출)")
     return cached
+
+
+def _cache_miss_reason(cached, cities, count):
+    """저장된 원본 JSON 을 캐시로 쓸 수 없는 이유. 쓸 수 있으면 None.
+
+    실패한 호출 결과를 캐시로 굳히지 않도록, 키를 고치거나 한도가 풀린 뒤 다시 실행하면 새로 호출한다.
+    """
+    recommendation = cached.get("recommendation")
+    if not recommendation:
+        return "이전 실행이 1차 추천에서 실패한 기록"
+    failed = [e for e in cached.get("errors", [])
+              if e.get("step") == "place_search" and e.get("type") != EMPTY_RESULT]
+    if failed:
+        return f"이전 실행에 맛집 검색 오류({failed[0]['type']}) 기록"
+    if not isinstance(cached.get("places"), dict):
+        return "places 형식이 올바르지 않음"
+    # options 가 없는 예전 파일은 실제 지역 수로 비교하고, 맛집 수는 비교하지 않는다
+    options = cached.get("options") or {}
+    saved_cities = options.get("cities", len(recommendation["recommended_cities"]))
+    if saved_cities != cities:
+        return f"지역 수가 다름(저장 {saved_cities}곳 · 요청 {cities}곳)"
+    if options.get("count", count) != count:
+        return f"맛집 수가 다름(저장 {options['count']}곳 · 요청 {count}곳)"
+    return None
 
 
 def _raw(date, cities, count, recommendation, places_by_city, errors):
@@ -134,6 +159,7 @@ def _raw(date, cities, count, recommendation, places_by_city, errors):
         "generated_at": datetime.now(KST).isoformat(timespec="seconds"),
         "llm_model": config.GEMINI_MODEL,
         "place_provider": "kakao_local_keyword",
+        "options": {"cities": cities, "count": count},
         "recommendation": recommendation,
         "places": places_by_city,
         "errors": list(errors),
