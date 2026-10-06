@@ -16,6 +16,7 @@ from errors import EMPTY_RESULT, PARSE_ERROR, classify_exception, classify_http
 KAKAO_URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
 STEP = "place_search"
 MAX_SIZE = 15  # Kakao 키워드 검색 size 상한
+SKIP_NOTE = "맛집 섹션은 '데이터 없음'으로 처리하고 계속 진행합니다."
 
 
 def _to_float(value):
@@ -50,7 +51,8 @@ def search_restaurants(city, count, errors, log=print):
     except requests.RequestException as exc:
         error_type = classify_exception(exc)
         errors.add(STEP, error_type, f"{type(exc).__name__}: {exc} (query={query})")
-        log(f"  - 오류: 네트워크 실패({type(exc).__name__}). 맛집 섹션은 '데이터 없음'으로 처리하고 계속 진행합니다.")
+        log(f"오류: 네트워크 실패({type(exc).__name__}). 인터넷 연결을 확인하세요.")
+        log(SKIP_NOTE)
         return []
 
     if response.status_code != 200:
@@ -61,19 +63,20 @@ def search_restaurants(city, count, errors, log=print):
             403: "권한 없음(403). 카카오맵 활성화 설정·앱 권한을 확인하세요.",
             429: "호출 한도 초과(429).",
         }.get(response.status_code, f"HTTP {response.status_code}.")
-        log(f"  - 오류: {hint}")
-        log("  - 맛집 섹션은 '데이터 없음'으로 처리하고 계속 진행합니다.")
+        log(f"오류: {hint}")
+        log(SKIP_NOTE)
         return []
 
     try:
         documents = response.json()["documents"]
     except (ValueError, KeyError, TypeError) as exc:
         errors.add(STEP, PARSE_ERROR, f"{type(exc).__name__}: {exc} (query={query})")
-        log("  - 오류: 응답 JSON 해석 실패. 맛집 섹션은 '데이터 없음'으로 처리합니다.")
+        log("오류: 응답 JSON 해석 실패.")
+        log(SKIP_NOTE)
         return []
 
     places = [_normalize(d) for d in documents][:count]
     if not places:
         errors.add(STEP, EMPTY_RESULT, f"0 results for query={query}")
-        log("  - 검색 결과 0건(키워드를 바꿔 재시도하지 않고 다음 단계로 진행)")
+        log("검색 결과 0건(키워드를 바꿔 재시도하지 않고 다음 단계로 진행)")
     return places

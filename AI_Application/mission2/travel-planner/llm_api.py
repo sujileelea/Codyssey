@@ -198,7 +198,7 @@ def recommend(date, city_count, errors, log):
             last_error = f"시도 {attempt}: {exc}"
             if attempt == 1:
                 errors.add("recommend", PARSE_ERROR, f"{last_error} → 필수 키만 다시 요청(재시도 1회)")
-            log(f"  - JSON 파싱 실패({last_error})" + (" → 필수 키만 다시 요청" if attempt == 1 else ""))
+            log(f"JSON 파싱 실패({last_error})" + (" → 필수 키만 다시 요청" if attempt == 1 else ""))
     raise LLMError(PARSE_ERROR, f"1차 추천 JSON 파싱 2회 실패 — {last_error}")
 
 
