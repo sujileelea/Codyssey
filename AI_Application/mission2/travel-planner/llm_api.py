@@ -17,31 +17,29 @@ from report import NO_PLACES
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
-# 1차 추천 JSON 스키마 — 필수 키(recommended_city/weather/events/reason)에
-# 보너스(recommended_cities)를 더한 형태. 첫 번째 도시가 대표 추천이다.
-RECOMMEND_SCHEMA = {
-    "type": "OBJECT",
-    "properties": {
-        "recommended_cities": {
-            "type": "ARRAY",
-            "minItems": 1,
-            "maxItems": 3,
-            "items": {
-                "type": "OBJECT",
-                "properties": {
-                    "city": {"type": "STRING"},
-                    "weather": {"type": "STRING"},
-                    "events": {"type": "ARRAY", "items": {"type": "STRING"}, "minItems": 1, "maxItems": 3},
-                    "reason": {"type": "STRING"},
-                },
-                "required": ["city", "weather", "events", "reason"],
-            },
-        },
-    },
-    "required": ["recommended_cities"],
+# 과제 1차 JSON 최소 스키마 — LLM 응답 최상위에 이 4키가 그대로 온다 (대표 추천 1곳)
+REQUIRED_KEYS = ("recommended_city", "weather", "events", "reason")
+
+CITY_PROPERTIES = {
+    "recommended_city": {"type": "STRING"},
+    "weather": {"type": "STRING"},
+    "events": {"type": "ARRAY", "items": {"type": "STRING"}, "minItems": 1, "maxItems": 3},
+    "reason": {"type": "STRING"},
 }
 
-CITY_KEYS = ("city", "weather", "events", "reason")
+
+def recommend_schema(city_count):
+    """Gemini responseSchema — 최상위 = 필수 4키. 보너스(복수 지역)면 나머지는 other_cities 에 같은 4키로."""
+    schema = {"type": "OBJECT", "properties": dict(CITY_PROPERTIES), "required": list(REQUIRED_KEYS)}
+    if city_count > 1:
+        schema["properties"]["other_cities"] = {
+            "type": "ARRAY",
+            "minItems": city_count - 1,
+            "maxItems": city_count - 1,
+            "items": {"type": "OBJECT", "properties": CITY_PROPERTIES, "required": list(REQUIRED_KEYS)},
+        }
+        schema["required"].append("other_cities")
+    return schema
 
 
 def _http_message(response):
@@ -121,65 +119,85 @@ def _extract_text(data):
 
 
 def parse_json_text(text):
-    """LLM 텍스트에서 JSON 객체를 꺼낸다. ```json 펜스가 섞여 있어도 처리."""
+    """LLM 텍스트에서 JSON 객체를 꺼낸다.
+
+    ```json 펜스를 벗기고, 그래도 안 되면 앞뒤 설명문을 잘라 첫 '{' ~ 마지막 '}' 구간만 다시 해석한다.
+    """
     text = text.strip()
     fenced = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
     if fenced:
         text = fenced.group(1).strip()
-    return json.loads(text)
+    try:
+        return json.loads(text)
+    except ValueError:
+        start, end = text.find("{"), text.rfind("}")
+        if start < 0 or end <= start:
+            raise
+        return json.loads(text[start:end + 1])
 
 
-def _validate_recommendation(data, city_count):
-    """필수 키와 타입을 검사하고, 대표 도시 키를 채워서 돌려준다."""
-    if not isinstance(data, dict):
-        raise ValueError("최상위가 JSON 객체가 아님")
-    cities = data.get("recommended_cities")
-    if not isinstance(cities, list) or not cities:
-        raise ValueError("recommended_cities 가 비어 있거나 배열이 아님")
-    cleaned = []
-    for item in cities[:city_count]:
-        if not isinstance(item, dict):
-            raise ValueError("recommended_cities 항목이 객체가 아님")
-        for key in CITY_KEYS:
-            if key not in item:
-                raise ValueError(f"도시 항목에 '{key}' 키가 없음")
-        if not isinstance(item["city"], str) or not item["city"].strip():
-            raise ValueError("city 가 빈 문자열")
-        events = item["events"]
-        if not isinstance(events, list) or not events:
-            raise ValueError("events 가 1개 이상인 배열이 아님")
-        cleaned.append({
-            "city": item["city"].strip(),
-            "weather": str(item["weather"]),
-            "events": [str(e) for e in events][:3],
-            "reason": str(item["reason"]),
-        })
-    first = cleaned[0]
+def _check_city(item, where):
+    """추천 1곳이 필수 4키와 타입을 갖췄는지 검사하고, 앞뒤 공백을 정리해 돌려준다."""
+    if not isinstance(item, dict):
+        raise ValueError(f"{where} 가 JSON 객체가 아님")
+    missing = [key for key in REQUIRED_KEYS if key not in item]
+    if missing:
+        raise ValueError(f"{where} 에 필수 키 없음: {', '.join(missing)}")
+    for key in ("recommended_city", "weather", "reason"):
+        if not isinstance(item[key], str) or not item[key].strip():
+            raise ValueError(f"{where}.{key} 가 비어 있거나 문자열이 아님")
+    events = item["events"]
+    if not isinstance(events, list) or not events or not all(isinstance(e, str) and e.strip() for e in events):
+        raise ValueError(f"{where}.events 가 1개 이상인 문자열 배열이 아님")
     return {
-        # 과제 필수 스키마 (대표 추천 = 첫 번째 도시)
-        "recommended_city": first["city"],
-        "weather": first["weather"],
-        "events": first["events"],
-        "reason": first["reason"],
-        # 보너스: 복수 지역
-        "recommended_cities": cleaned,
+        "recommended_city": item["recommended_city"].strip(),
+        "weather": item["weather"].strip(),
+        "events": [e.strip() for e in events][:3],
+        "reason": item["reason"].strip(),
     }
 
 
-def _recommend_prompt(date, city_count, retry=False):
-    prompt = f"""당신은 국내 여행 전문가입니다. 여행 날짜 {date} 에 여행하기 좋은 대한민국 국내 지역을 {city_count}곳 추천하세요.
-가장 추천하는 지역을 첫 번째에 두세요. 지역명은 '제주', '강릉', '경주'처럼 시·군 단위의 짧은 한글 이름으로 씁니다.
+def _validate_recommendation(data, city_count):
+    """1차 JSON 검증 — 최상위 필수 4키·타입, other_cities 각 항목도 같은 규칙.
 
-각 지역마다:
-- city: 지역명 (짧은 한글)
+    돌려주는 값 = 최상위 4키(대표 추천) + recommended_cities(보너스: 대표 포함 전체 목록).
+    """
+    if not isinstance(data, dict):
+        raise ValueError("최상위가 JSON 객체가 아님")
+    first = _check_city(data, "최상위")
+    others = data.get("other_cities") or []
+    if not isinstance(others, list):
+        raise ValueError("other_cities 가 배열이 아님")
+    cities = [first]
+    for i, item in enumerate(others):
+        city = _check_city(item, f"other_cities[{i}]")
+        if all(city["recommended_city"] != c["recommended_city"] for c in cities):   # 겹치는 지역은 뺀다
+            cities.append(city)
+    return {**first, "recommended_cities": cities[:city_count]}
+
+
+def _recommend_prompt(date, city_count, retry_reason=None):
+    others = ""
+    shape = '{{"recommended_city": "...", "weather": "...", "events": ["..."], "reason": "..."}}'
+    if city_count > 1:
+        others = f"\n나머지 {city_count - 1}곳은 other_cities 배열에 같은 4개 키로 씁니다 (대표 지역과 겹치지 않게)."
+        shape = ('{{"recommended_city": "...", "weather": "...", "events": ["..."], "reason": "...", '
+                 '"other_cities": [{{"recommended_city": "...", "weather": "...", "events": ["..."], "reason": "..."}}]}}')
+    prompt = f"""당신은 국내 여행 전문가입니다. 여행 날짜 {date} 에 여행하기 좋은 대한민국 국내 지역을 {city_count}곳 추천하세요.
+지역명은 '제주', '강릉', '경주'처럼 시·군 단위의 짧은 한글 이름으로 씁니다. '강원도'·'경상북도' 같은 도 단위는 쓰지 않습니다.
+
+가장 추천하는 1곳은 최상위 키로 씁니다:
+- recommended_city: 지역명
 - weather: 그 시기의 일반적인 날씨 요약 (1문장)
 - events: 그 시기에 열리는 행사·축제 후보 1~3개 (문자열 배열, 일정은 변동 가능하다는 전제)
-- reason: 추천 근거 2~4문장
+- reason: 추천 근거 2~4문장{others}
 
 반드시 아래 형태의 JSON 만 출력합니다. 설명 문장이나 코드 펜스는 붙이지 마세요.
-{{"recommended_cities": [{{"city": "...", "weather": "...", "events": ["..."], "reason": "..."}}]}}"""
-    if retry:
-        prompt += "\n\n(이전 응답은 JSON 으로 해석되지 않았습니다. 위 필수 키만 담은 순수 JSON 을 다시 출력하세요.)"
+{shape.format()}"""
+    if retry_reason:
+        prompt += (f"\n\n(이전 응답은 JSON 으로 해석되지 않았습니다 — {retry_reason}. "
+                   "필수 키 recommended_city·weather·events·reason 만 담은 순수 JSON 을 다시 출력하세요. "
+                   "문장이 길면 짧게 줄여서라도 JSON 을 끝까지 닫으세요.)")
     return prompt
 
 
@@ -189,12 +207,14 @@ def recommend(date, city_count, errors, log):
     첫 시도의 파싱 실패는 재시도로 복구돼도 errors 에 남긴다.
     """
     last_error = None
+    reason = None
     for attempt in (1, 2):
-        text = _generate(_recommend_prompt(date, city_count, retry=attempt == 2), RECOMMEND_SCHEMA,
+        text = _generate(_recommend_prompt(date, city_count, retry_reason=reason), recommend_schema(city_count),
                          temperature=0.8, log=log)
         try:
             return _validate_recommendation(parse_json_text(text), city_count)
         except (ValueError, TypeError) as exc:
+            reason = str(exc)
             last_error = f"시도 {attempt}: {exc}"
             if attempt == 1:
                 errors.add("recommend", PARSE_ERROR, f"{last_error} → 필수 키만 다시 요청(재시도 1회)")
@@ -204,9 +224,10 @@ def recommend(date, city_count, errors, log):
 
 REPORT_SECTIONS = ("추천 이유", "날씨 요약", "행사/축제", "맛집 추천", "1일 일정 제안")
 
+
 def check_report(markdown, date, recommendation, places_by_city):
     """LLM 리포트가 과제 필수 항목을 다 갖췄는지 검사한다. 빠진 것이 있으면 ValueError."""
-    cities = [c["city"] for c in recommendation["recommended_cities"]]
+    cities = [c["recommended_city"] for c in recommendation["recommended_cities"]]
     missing = []
     if not markdown.startswith(f"# {date} 국내 여행 추천 리포트"):
         missing.append("제목")

@@ -19,7 +19,19 @@ def save_raw(path, raw):
 
 def load_raw(path):
     with open(path, encoding="utf-8") as f:
-        return json.load(f)
+        return upgrade_raw(json.load(f))
+
+
+def upgrade_raw(raw):
+    """예전 형식(recommended_cities 항목의 지역명 키가 city)을 지금 형식(recommended_city)으로 맞춘다."""
+    recommendation = raw.get("recommendation") if isinstance(raw, dict) else None
+    if isinstance(recommendation, dict) and isinstance(recommendation.get("recommended_cities"), list):
+        recommendation["recommended_cities"] = [
+            {"recommended_city": c["city"], **{k: v for k, v in c.items() if k != "city"}}
+            if isinstance(c, dict) and "city" in c and "recommended_city" not in c else c
+            for c in recommendation["recommended_cities"]
+        ]
+    return raw
 
 
 def save_report(path, markdown):
@@ -57,10 +69,10 @@ def fallback_report(date, recommendation, places_by_city):
     lines = [f"# {date} 국내 여행 추천 리포트", "",
              "> LLM 리포트 생성에 실패해 수집 데이터로만 구성한 리포트입니다.", "",
              "## 추천 지역", ""]
-    lines += [f"- {c['city']}" + (" (대표 추천)" if i == 0 else "") for i, c in enumerate(cities)]
+    lines += [f"- {c['recommended_city']}" + (" (대표 추천)" if i == 0 else "") for i, c in enumerate(cities)]
     lines.append("")
     for i, city in enumerate(cities, start=1):
-        name = city["city"]
+        name = city["recommended_city"]
         places = places_by_city.get(name, [])
         lines += [f"## {i}. {name}", "",
                   "### 추천 이유", "", city["reason"], "",

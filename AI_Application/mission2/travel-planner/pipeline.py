@@ -76,7 +76,7 @@ def run(date, cities=3, count=5, use_cache=True, emit=print_event):
                 errors.add(e["step"], e["type"], e["message"])
         step(1, "1차 추천 (캐시)")
         for c in recommendation["recommended_cities"]:
-            log(1, "info", c["city"])
+            log(1, "info", c["recommended_city"])
         step(2, "맛집 검색 (캐시)")
         for city, places in places_by_city.items():
             log(2, "info", f"{city}: {len(places)}곳")
@@ -93,14 +93,14 @@ def run(date, cities=3, count=5, use_cache=True, emit=print_event):
             saved = save(report.save_raw, raw_file, raw, 1)
             return _result(False, date, raw_file, None, raw, None, cached=False, saved=saved)
         for c in recommendation["recommended_cities"]:
-            log(1, "info", f'recommended_city: "{c["city"]}"')
+            log(1, "info", f'recommended_city: "{c["recommended_city"]}"')
 
         # [2/3] 지역별 맛집 검색 — 실패·0건이어도 계속 진행
         step(2, "맛집 검색 중(Kakao Local)...")
         places_by_city = {}
         stop = None   # 인증·쿼터 실패면 같은 키로 나머지 지역도 실패하므로 호출을 멈춘다
         for c in recommendation["recommended_cities"]:
-            city = c["city"]
+            city = c["recommended_city"]
             if stop:
                 errors.add(place_api.STEP, stop, f"앞 지역의 {stop} 로 검색 생략 (query={city} 맛집)")
                 log(2, "warn", f"{city}: 앞 지역에서 {stop} — 같은 키라 검색을 건너뜁니다 (데이터 없음)")

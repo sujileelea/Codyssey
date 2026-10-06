@@ -107,7 +107,7 @@ def list_results():
             items.append({
                 "date": date,
                 "generated_at": raw.get("generated_at"),
-                "cities": [c.get("city") for c in recommendation.get("recommended_cities", [])],
+                "cities": [c.get("recommended_city") for c in recommendation.get("recommended_cities", [])],
                 "places": sum(len(v) for v in places.values()),
                 "errors": len(raw.get("errors", [])),
                 "ok": bool(recommendation),

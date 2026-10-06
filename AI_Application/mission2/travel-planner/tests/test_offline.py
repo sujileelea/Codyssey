@@ -5,6 +5,7 @@
 
 import json
 import os
+import re
 import sys
 
 import pytest
@@ -36,10 +37,11 @@ def gemini_text(text):
     return FakeResponse(200, {"candidates": [{"content": {"parts": [{"text": text}]}}]})
 
 
-GOOD_RECOMMENDATION = {"recommended_cities": [
-    {"city": "제주", "weather": "온화", "events": ["유채꽃 축제"], "reason": "봄꽃."},
-    {"city": "강릉", "weather": "선선", "events": ["커피축제"], "reason": "바다."},
-]}
+# LLM 1차 응답 — 최상위 = 과제 필수 4키, 복수 지역은 other_cities
+GOOD_RECOMMENDATION = {
+    "recommended_city": "제주", "weather": "온화", "events": ["유채꽃 축제"], "reason": "봄꽃.",
+    "other_cities": [{"recommended_city": "강릉", "weather": "선선", "events": ["커피축제"], "reason": "바다."}],
+}
 
 
 def good_report(date="2026-10-03", cities=("제주", "강릉"), no_places=False):
@@ -122,14 +124,14 @@ def test_recommend_retries_once_after_parse_failure(monkeypatch):
     assert len(calls) == 2
     assert "다시 출력" in calls[1]["contents"][0]["parts"][0]["text"]
     assert result["recommended_city"] == "제주" and result["events"] == ["유채꽃 축제"]
-    assert [c["city"] for c in result["recommended_cities"]] == ["제주", "강릉"]
+    assert [c["recommended_city"] for c in result["recommended_cities"]] == ["제주", "강릉"]
     # 재시도로 복구됐어도 첫 실패는 errors 에 남는다
     assert [(e["step"], e["type"]) for e in errors] == [("recommend", PARSE_ERROR)]
     assert errors.items[0]["message"].startswith("시도 1:")
 
 
 def test_recommend_rejects_empty_events_then_retries(monkeypatch):
-    empty = {"recommended_cities": [{"city": "제주", "weather": "온화", "events": [], "reason": "봄꽃."}]}
+    empty = {"recommended_city": "제주", "weather": "온화", "events": [], "reason": "봄꽃."}
     replies = iter([gemini_text(json.dumps(empty, ensure_ascii=False)),
                     gemini_text(json.dumps(GOOD_RECOMMENDATION, ensure_ascii=False))])
     monkeypatch.setattr(llm_api.requests, "post", lambda *a, **k: next(replies))
@@ -143,8 +145,10 @@ def test_recommend_schema_limits_events_1_to_3(monkeypatch):
     monkeypatch.setattr(llm_api.requests, "post",
                         lambda *a, **k: sent.append(k["json"]) or gemini_text(json.dumps(GOOD_RECOMMENDATION)))
     llm_api.recommend("2026-10-03", 1, ErrorLog(), log=lambda *_: None)
-    events = sent[0]["generationConfig"]["responseSchema"]["properties"]["recommended_cities"]["items"]["properties"]["events"]
-    assert (events["minItems"], events["maxItems"]) == (1, 3)
+    schema = sent[0]["generationConfig"]["responseSchema"]
+    assert schema["required"] == ["recommended_city", "weather", "events", "reason"]
+    assert (schema["properties"]["events"]["minItems"], schema["properties"]["events"]["maxItems"]) == (1, 3)
+    assert "other_cities" not in schema["properties"]          # 1곳이면 과제 최소 스키마 그대로
 
 
 def test_recommend_gives_up_after_two_failures(monkeypatch):
@@ -260,7 +264,7 @@ def test_report_missing_sections_falls_back(monkeypatch, tmp_path):
 
 
 def test_check_report_requires_no_data_mark_for_empty_city():
-    rec = {"recommended_cities": [{"city": "제주"}, {"city": "강릉"}]}
+    rec = {"recommended_cities": [{"recommended_city": "제주"}, {"recommended_city": "강릉"}]}
     places = {"제주": [{"name": "A"}], "강릉": []}
     with pytest.raises(ValueError, match="데이터 없음"):
         llm_api.check_report(good_report(), "2026-10-03", rec, places)
@@ -270,7 +274,7 @@ def test_check_report_requires_no_data_mark_for_empty_city():
 def test_report_drops_llm_written_errors_section(monkeypatch):
     text = good_report() + "\n\n## 오류 요약(errors)\n- 지어낸 오류"
     monkeypatch.setattr(llm_api.requests, "post", lambda *a, **k: gemini_text(text))
-    rec = {"recommended_cities": [{"city": "제주"}, {"city": "강릉"}]}
+    rec = {"recommended_cities": [{"recommended_city": "제주"}, {"recommended_city": "강릉"}]}
     md = llm_api.write_report("2026-10-03", rec, {"제주": [{"name": "A"}], "강릉": [{"name": "B"}]})
     assert "오류 요약" not in md
 
@@ -420,3 +424,48 @@ def test_main_handles_interrupt_and_unexpected(monkeypatch, capsys, exc, code, t
     with pytest.raises(SystemExit) as caught:
         travel_planner.main()
     assert caught.value.code == code and text in capsys.readouterr().err
+
+
+# --- 1차 JSON 스키마 (필수 4키) ----------------------------------------------------
+
+def test_recommend_keeps_required_four_keys_at_top(monkeypatch):
+    monkeypatch.setattr(llm_api.requests, "post", lambda *a, **k: gemini_text(json.dumps(GOOD_RECOMMENDATION)))
+    result = llm_api.recommend("2026-10-03", 2, ErrorLog(), log=lambda *_: None)
+    assert list(result)[:4] == ["recommended_city", "weather", "events", "reason"]
+    assert isinstance(result["events"], list) and isinstance(result["reason"], str)
+    assert [c["recommended_city"] for c in result["recommended_cities"]] == ["제주", "강릉"]
+
+
+@pytest.mark.parametrize("broken, why", [
+    ({"weather": "w", "events": ["e"], "reason": "r"}, "필수 키 없음: recommended_city"),
+    ({"recommended_city": "제주", "weather": 3, "events": ["e"], "reason": "r"}, "weather"),
+    ({"recommended_city": "제주", "weather": "w", "events": "축제", "reason": "r"}, "events"),
+    ({"recommended_city": "제주", "weather": "w", "events": ["e"], "reason": "r",
+      "other_cities": [{"recommended_city": "강릉"}]}, "other_cities[0]"),
+])
+def test_recommend_validation_names_the_problem(broken, why):
+    with pytest.raises(ValueError, match=re.escape(why)):
+        llm_api._validate_recommendation(broken, 2)
+
+
+def test_parse_strips_prose_around_json():
+    text = '추천 결과입니다:\n{"recommended_city": "제주", "weather": "w", "events": ["e"], "reason": "r"}\n이상입니다.'
+    assert llm_api.parse_json_text(text)["recommended_city"] == "제주"
+
+
+def test_retry_prompt_carries_failure_reason(monkeypatch):
+    sent = []
+    replies = iter([gemini_text('{"recommended_city": "제주", "weather": "w", "events": ["e"], "reason": "r"'),   # 닫는 괄호 없음
+                    gemini_text(json.dumps(GOOD_RECOMMENDATION))])
+    monkeypatch.setattr(llm_api.requests, "post", lambda *a, **k: sent.append(k["json"]) or next(replies))
+    llm_api.recommend("2026-10-03", 1, ErrorLog(), log=lambda *_: None)
+    retry_prompt = sent[1]["contents"][0]["parts"][0]["text"]
+    assert "JSON 으로 해석되지 않았습니다 —" in retry_prompt and "끝까지 닫으세요" in retry_prompt
+
+
+def test_old_raw_files_are_upgraded_on_load(tmp_path):
+    old = {"recommendation": {"recommended_city": "제주", "recommended_cities": [{"city": "제주", "weather": "w"}]}}
+    (tmp_path / "old.json").write_text(json.dumps(old, ensure_ascii=False), encoding="utf-8")
+    item = report.load_raw(str(tmp_path / "old.json"))["recommendation"]["recommended_cities"][0]
+    assert item == {"recommended_city": "제주", "weather": "w"}
+

@@ -265,7 +265,7 @@ const MapView = {
 function cityGroups(raw) {
   const cities = (raw.recommendation && raw.recommendation.recommended_cities) || [];
   return cities.map((c, index) => ({
-    index, city: c.city, color: cityColor(index), places: (raw.places && raw.places[c.city]) || [],
+    index, city: c.recommended_city, color: cityColor(index), places: (raw.places && raw.places[c.recommended_city]) || [],
   }));
 }
 
