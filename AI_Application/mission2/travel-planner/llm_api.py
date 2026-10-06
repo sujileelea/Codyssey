@@ -22,12 +22,14 @@ RECOMMEND_SCHEMA = {
     "properties": {
         "recommended_cities": {
             "type": "ARRAY",
+            "minItems": 1,
+            "maxItems": 3,
             "items": {
                 "type": "OBJECT",
                 "properties": {
                     "city": {"type": "STRING"},
                     "weather": {"type": "STRING"},
-                    "events": {"type": "ARRAY", "items": {"type": "STRING"}},
+                    "events": {"type": "ARRAY", "items": {"type": "STRING"}, "minItems": 1, "maxItems": 3},
                     "reason": {"type": "STRING"},
                 },
                 "required": ["city", "weather", "events", "reason"],
@@ -122,8 +124,8 @@ def _validate_recommendation(data, city_count):
         if not isinstance(item["city"], str) or not item["city"].strip():
             raise ValueError("city 가 빈 문자열")
         events = item["events"]
-        if not isinstance(events, list):
-            raise ValueError("events 가 배열이 아님")
+        if not isinstance(events, list) or not events:
+            raise ValueError("events 가 1개 이상인 배열이 아님")
         cleaned.append({
             "city": item["city"].strip(),
             "weather": str(item["weather"]),
@@ -159,8 +161,11 @@ def _recommend_prompt(date, city_count, retry=False):
     return prompt
 
 
-def recommend(date, city_count, log):
-    """1차 추천 JSON 을 만든다. 파싱 실패 시 프롬프트를 고쳐 1회만 재시도한다."""
+def recommend(date, city_count, errors, log):
+    """1차 추천 JSON 을 만든다. 파싱 실패 시 프롬프트를 고쳐 1회만 재시도한다.
+
+    첫 시도의 파싱 실패는 재시도로 복구돼도 errors 에 남긴다.
+    """
     last_error = None
     for attempt in (1, 2):
         text = _generate(_recommend_prompt(date, city_count, retry=attempt == 2), RECOMMEND_SCHEMA, temperature=0.8)
@@ -168,6 +173,8 @@ def recommend(date, city_count, log):
             return _validate_recommendation(parse_json_text(text), city_count)
         except (ValueError, TypeError) as exc:
             last_error = f"시도 {attempt}: {exc}"
+            if attempt == 1:
+                errors.add("recommend", PARSE_ERROR, f"{last_error} → 필수 키만 다시 요청(재시도 1회)")
             log(f"  - JSON 파싱 실패({last_error})" + (" → 필수 키만 다시 요청" if attempt == 1 else ""))
     raise LLMError(PARSE_ERROR, f"1차 추천 JSON 파싱 2회 실패 — {last_error}")
 

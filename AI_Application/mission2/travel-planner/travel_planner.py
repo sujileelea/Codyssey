@@ -93,7 +93,7 @@ def run(args):
         # [1/3] LLM 1차 추천 — 실패하면 다음 단계 입력이 없으므로 종료
         print(f"[1/3] 1차 추천 생성 중(LLM · {config.GEMINI_MODEL})...")
         try:
-            recommendation = llm_api.recommend(args.date, args.cities, log=print)
+            recommendation = llm_api.recommend(args.date, args.cities, errors, log=print)
         except llm_api.LLMError as exc:
             errors.add("recommend", exc.error_type, str(exc))
             print(f"  - 오류: {exc.error_type} — {exc}")

@@ -37,7 +37,7 @@ def gemini_text(text):
 
 GOOD_RECOMMENDATION = {"recommended_cities": [
     {"city": "제주", "weather": "온화", "events": ["유채꽃 축제"], "reason": "봄꽃."},
-    {"city": "강릉", "weather": "선선", "events": [], "reason": "바다."},
+    {"city": "강릉", "weather": "선선", "events": ["커피축제"], "reason": "바다."},
 ]}
 
 
@@ -105,31 +105,54 @@ def test_recommend_retries_once_after_parse_failure(monkeypatch):
     replies = iter([gemini_text("이건 JSON 이 아님"), gemini_text(json.dumps(GOOD_RECOMMENDATION, ensure_ascii=False))])
     calls = []
     monkeypatch.setattr(llm_api.requests, "post", lambda *a, **k: calls.append(k["json"]) or next(replies))
-    result = llm_api.recommend("2026-10-03", 2, log=lambda *_: None)
+    errors = ErrorLog()
+    result = llm_api.recommend("2026-10-03", 2, errors, log=lambda *_: None)
     assert len(calls) == 2
     assert "다시 출력" in calls[1]["contents"][0]["parts"][0]["text"]
     assert result["recommended_city"] == "제주" and result["events"] == ["유채꽃 축제"]
     assert [c["city"] for c in result["recommended_cities"]] == ["제주", "강릉"]
+    # 재시도로 복구됐어도 첫 실패는 errors 에 남는다
+    assert [(e["step"], e["type"]) for e in errors] == [("recommend", PARSE_ERROR)]
+    assert errors.items[0]["message"].startswith("시도 1:")
+
+
+def test_recommend_rejects_empty_events_then_retries(monkeypatch):
+    empty = {"recommended_cities": [{"city": "제주", "weather": "온화", "events": [], "reason": "봄꽃."}]}
+    replies = iter([gemini_text(json.dumps(empty, ensure_ascii=False)),
+                    gemini_text(json.dumps(GOOD_RECOMMENDATION, ensure_ascii=False))])
+    monkeypatch.setattr(llm_api.requests, "post", lambda *a, **k: next(replies))
+    errors = ErrorLog()
+    assert llm_api.recommend("2026-10-03", 1, errors, log=lambda *_: None)["events"] == ["유채꽃 축제"]
+    assert "events" in errors.items[0]["message"]
+
+
+def test_recommend_schema_limits_events_1_to_3(monkeypatch):
+    sent = []
+    monkeypatch.setattr(llm_api.requests, "post",
+                        lambda *a, **k: sent.append(k["json"]) or gemini_text(json.dumps(GOOD_RECOMMENDATION)))
+    llm_api.recommend("2026-10-03", 1, ErrorLog(), log=lambda *_: None)
+    events = sent[0]["generationConfig"]["responseSchema"]["properties"]["recommended_cities"]["items"]["properties"]["events"]
+    assert (events["minItems"], events["maxItems"]) == (1, 3)
 
 
 def test_recommend_gives_up_after_two_failures(monkeypatch):
     monkeypatch.setattr(llm_api.requests, "post", lambda *a, **k: gemini_text("{\"recommended_cities\": []}"))
     with pytest.raises(llm_api.LLMError) as exc:
-        llm_api.recommend("2026-10-03", 2, log=lambda *_: None)
+        llm_api.recommend("2026-10-03", 2, ErrorLog(), log=lambda *_: None)
     assert exc.value.error_type == PARSE_ERROR
 
 
 def test_recommend_strips_code_fence(monkeypatch):
     fenced = "```json\n" + json.dumps(GOOD_RECOMMENDATION, ensure_ascii=False) + "\n```"
     monkeypatch.setattr(llm_api.requests, "post", lambda *a, **k: gemini_text(fenced))
-    assert llm_api.recommend("2026-10-03", 1, log=lambda *_: None)["recommended_city"] == "제주"
+    assert llm_api.recommend("2026-10-03", 1, ErrorLog(), log=lambda *_: None)["recommended_city"] == "제주"
 
 
 def test_gemini_invalid_key_is_auth_error(monkeypatch):
     monkeypatch.setattr(llm_api.requests, "post",
                         lambda *a, **k: FakeResponse(400, {"error": {"message": "API key not valid."}}))
     with pytest.raises(llm_api.LLMError) as exc:
-        llm_api.recommend("2026-10-03", 1, log=lambda *_: None)
+        llm_api.recommend("2026-10-03", 1, ErrorLog(), log=lambda *_: None)
     assert exc.value.error_type == AUTH_ERROR
     assert str(exc.value) == "HTTP 400 API key not valid."
 
