@@ -82,8 +82,10 @@ def run(args):
         print(result["markdown"])
     if errors:
         print(f"      오류 {len(errors)}건 — 리포트 끝 '오류 요약(errors)' 참고")
+        shown = set()   # 같은 유형의 조치 안내는 한 번만
         for e in errors:
-            tip = hint(e["type"])
+            tip = hint(e["type"]) if e["type"] not in shown else ""
+            shown.add(e["type"])
             print(f"        · {e['step']} {e['type']}: {e['message']}" + (f"\n          → {tip}" if tip else ""))
     if not result["saved"]:
         return 1

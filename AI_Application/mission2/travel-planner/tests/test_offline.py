@@ -407,10 +407,10 @@ def test_report_save_failure_prints_report_and_exits_1(monkeypatch, tmp_path, ca
     assert raw["errors"][-1]["type"] == "IO_ERROR"
 
 
-def test_cli_summary_shows_hint(monkeypatch, capsys):
+def test_cli_summary_shows_hint_once_per_type(monkeypatch, capsys):
     stub_pipeline(monkeypatch, lambda: FakeResponse(401, {}))
-    travel_planner.run(make_args())
-    assert "→ 키 값·권한을 확인하세요" in capsys.readouterr().out
+    travel_planner.run(make_args())          # 401 + 나머지 지역 생략 = AUTH_ERROR 2건
+    assert capsys.readouterr().out.count("→ 키 값·권한을 확인하세요") == 1
 
 
 @pytest.mark.parametrize("exc, code, text", [(KeyboardInterrupt(), 130, "중단했습니다"),
