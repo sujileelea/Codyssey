@@ -11,6 +11,7 @@ import re
 import requests
 
 import config
+import net
 from errors import AUTH_ERROR, LLM_ERROR, PARSE_ERROR, classify_exception, classify_http
 from report import NO_PLACES
 
@@ -67,7 +68,7 @@ class LLMError(Exception):
         self.error_type = error_type
 
 
-def _generate(prompt, response_schema=None, temperature=0.7):
+def _generate(prompt, response_schema=None, temperature=0.7, log=None):
     """Gemini generateContent 를 호출해 텍스트를 돌려준다."""
     url = GEMINI_URL.format(model=config.GEMINI_MODEL)
     headers = {
@@ -84,7 +85,7 @@ def _generate(prompt, response_schema=None, temperature=0.7):
         "generationConfig": generation_config,
     }
     try:
-        response = requests.post(url, headers=headers, json=body, timeout=config.REQUEST_TIMEOUT)
+        response = net.send("POST", url, notify=log, headers=headers, json=body, timeout=config.REQUEST_TIMEOUT)
     except requests.RequestException as exc:
         raise LLMError(classify_exception(exc), f"{type(exc).__name__}: {exc}") from exc
 
@@ -189,7 +190,8 @@ def recommend(date, city_count, errors, log):
     """
     last_error = None
     for attempt in (1, 2):
-        text = _generate(_recommend_prompt(date, city_count, retry=attempt == 2), RECOMMEND_SCHEMA, temperature=0.8)
+        text = _generate(_recommend_prompt(date, city_count, retry=attempt == 2), RECOMMEND_SCHEMA,
+                         temperature=0.8, log=log)
         try:
             return _validate_recommendation(parse_json_text(text), city_count)
         except (ValueError, TypeError) as exc:
@@ -223,7 +225,7 @@ def check_report(markdown, date, recommendation, places_by_city):
         raise ValueError("리포트 필수 항목 누락: " + ", ".join(missing))
 
 
-def write_report(date, recommendation, places_by_city):
+def write_report(date, recommendation, places_by_city, log=None):
     """최종 여행 리포트(Markdown)를 생성한다. 필수 항목이 빠지면 PARSE_ERROR 로 실패시킨다.
 
     실패하면 호출한 쪽이 데이터만으로 만든 대체 리포트를 쓴다.
@@ -247,7 +249,7 @@ def write_report(date, recommendation, places_by_city):
 
 데이터:
 {json.dumps(payload, ensure_ascii=False, indent=2)}"""
-    text = _generate(prompt, temperature=0.6).strip()
+    text = _generate(prompt, temperature=0.6, log=log).strip()
     fenced = re.fullmatch(r"```(?:markdown|md)?\s*(.*?)```", text, re.DOTALL)
     markdown = fenced.group(1).strip() if fenced else text
     # 오류 요약은 프로그램이 붙이므로, LLM 이 지시를 어기고 썼다면 잘라 낸다

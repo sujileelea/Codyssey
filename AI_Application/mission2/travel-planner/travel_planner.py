@@ -117,7 +117,7 @@ def run(args):
     # [3/3] LLM 최종 리포트 — 실패하면 데이터만으로 대체 리포트를 만든다
     print("[3/3] 최종 리포트 생성 중(LLM)...")
     try:
-        markdown = llm_api.write_report(args.date, recommendation, places_by_city)
+        markdown = llm_api.write_report(args.date, recommendation, places_by_city, log=print)
         print("    - 리포트 생성 완료")
     except llm_api.LLMError as exc:
         errors.add("report", exc.error_type, str(exc))

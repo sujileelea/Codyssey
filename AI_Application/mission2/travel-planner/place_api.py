@@ -10,6 +10,7 @@
 import requests
 
 import config
+import net
 from errors import EMPTY_RESULT, PARSE_ERROR, classify_exception, classify_http
 
 KAKAO_URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
@@ -44,7 +45,8 @@ def search_restaurants(city, count, errors, log=print):
     headers = {"Authorization": f"KakaoAK {config.KAKAO_REST_API_KEY}"}
 
     try:
-        response = requests.get(KAKAO_URL, headers=headers, params=params, timeout=config.REQUEST_TIMEOUT)
+        response = net.send("GET", KAKAO_URL, notify=log, headers=headers, params=params,
+                            timeout=config.REQUEST_TIMEOUT)
     except requests.RequestException as exc:
         error_type = classify_exception(exc)
         errors.add(STEP, error_type, f"{type(exc).__name__}: {exc} (query={query})")

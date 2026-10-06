@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config  # noqa: E402
 import llm_api  # noqa: E402
+import net  # noqa: E402
 import place_api  # noqa: E402
 import report  # noqa: E402
 import travel_planner  # noqa: E402
@@ -56,6 +57,7 @@ def keys(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "GEMINI_API_KEY", "test")
     monkeypatch.setattr(config, "KAKAO_REST_API_KEY", "test")
     monkeypatch.setattr(config, "RESULTS_DIR", str(tmp_path))
+    monkeypatch.setattr(net, "RETRY_DELAY", 0)
 
 
 # --- 입력 검증 ---------------------------------------------------------------
@@ -271,3 +273,54 @@ def test_report_drops_llm_written_errors_section(monkeypatch):
     rec = {"recommended_cities": [{"city": "제주"}, {"city": "강릉"}]}
     md = llm_api.write_report("2026-10-03", rec, {"제주": [{"name": "A"}], "강릉": [{"name": "B"}]})
     assert "오류 요약" not in md
+
+
+# --- 일시 오류 재시도 -------------------------------------------------------------
+
+def counting(responses):
+    """호출마다 다음 응답을 돌려주고(예외면 raise) 호출 수를 센다."""
+    seq = iter(responses)
+    calls = []
+
+    def fake(*a, **k):
+        calls.append(1)
+        item = next(seq)
+        if isinstance(item, Exception):
+            raise item
+        return item
+    return fake, calls
+
+
+def test_gemini_503_is_retried_once_then_succeeds(monkeypatch):
+    fake, calls = counting([FakeResponse(503, {"error": {"message": "overloaded"}}),
+                            gemini_text(json.dumps(GOOD_RECOMMENDATION, ensure_ascii=False))])
+    monkeypatch.setattr(llm_api.requests, "post", fake)
+    notes = []
+    assert llm_api.recommend("2026-10-03", 1, ErrorLog(), log=notes.append)["recommended_city"] == "제주"
+    assert len(calls) == 2 and "HTTP 503" in notes[0]
+
+
+def test_gemini_503_twice_gives_http_error(monkeypatch):
+    fake, calls = counting([FakeResponse(503, {"error": {"message": "overloaded"}})] * 2)
+    monkeypatch.setattr(llm_api.requests, "post", fake)
+    with pytest.raises(llm_api.LLMError) as exc:
+        llm_api.recommend("2026-10-03", 1, ErrorLog(), log=lambda *_: None)
+    assert len(calls) == 2 and exc.value.error_type == "HTTP_ERROR"
+
+
+@pytest.mark.parametrize("first", [FakeResponse(401, {}), FakeResponse(429, {}),
+                                   place_api.requests.ReadTimeout("slow")])
+def test_auth_quota_readtimeout_are_not_retried(monkeypatch, first):
+    fake, calls = counting([first])
+    monkeypatch.setattr(place_api.requests, "get", fake)
+    assert place_api.search_restaurants("제주", 5, ErrorLog(), log=lambda *_: None) == []
+    assert len(calls) == 1
+
+
+def test_kakao_connection_error_recovers_on_retry(monkeypatch):
+    fake, calls = counting([place_api.requests.ConnectionError("reset"),
+                            FakeResponse(200, {"documents": [{"place_name": "A", "address_name": "B"}]})])
+    monkeypatch.setattr(place_api.requests, "get", fake)
+    errors = ErrorLog()
+    assert len(place_api.search_restaurants("제주", 5, errors, log=lambda *_: None)) == 1
+    assert len(calls) == 2 and not errors.items
