@@ -348,11 +348,11 @@ def stub_pipeline(monkeypatch, kakao):
 
 
 def test_place_search_failure_is_not_reused_as_cache(monkeypatch, tmp_path, capsys):
-    replies = iter([FakeResponse(401, {})] * 2 + [FakeResponse(200, {"documents": [{"place_name": "A"}]})] * 2)
+    replies = iter([FakeResponse(401, {})] + [FakeResponse(200, {"documents": [{"place_name": "A"}]})] * 2)
     calls = stub_pipeline(monkeypatch, lambda: next(replies))
     assert travel_planner.run(make_args()) == 0                 # 잘못된 키 → 맛집 데이터 없음
     assert travel_planner.run(make_args()) == 0                 # 키를 고친 뒤 → 캐시 대신 다시 검색
-    assert calls["get"] == 4
+    assert calls["get"] == 3                                    # 1회차는 첫 지역 401 뒤 나머지 생략
     assert "맛집 검색 오류(AUTH_ERROR)" in capsys.readouterr().out
     raw = json.load(open(tmp_path / "2026-10-03_raw.json", encoding="utf-8"))
     assert raw["errors"] == [] and raw["places"]["제주"][0]["name"] == "A"
@@ -375,3 +375,13 @@ def test_corrupt_cache_is_ignored(monkeypatch, tmp_path, capsys):
     stub_pipeline(monkeypatch, lambda: FakeResponse(200, {"documents": [{"place_name": "A"}]}))
     assert travel_planner.run(make_args()) == 0
     assert "읽기 실패" in capsys.readouterr().out
+
+
+def test_auth_error_skips_remaining_cities(monkeypatch, tmp_path):
+    calls = stub_pipeline(monkeypatch, lambda: FakeResponse(401, {}))
+    assert travel_planner.run(make_args()) == 0
+    raw = json.load(open(tmp_path / "2026-10-03_raw.json", encoding="utf-8"))
+    assert calls["get"] == 1
+    assert [e["type"] for e in raw["errors"]] == [AUTH_ERROR, AUTH_ERROR]
+    assert "검색 생략 (query=강릉 맛집)" in raw["errors"][1]["message"]
+    assert raw["places"] == {"제주": [], "강릉": []}

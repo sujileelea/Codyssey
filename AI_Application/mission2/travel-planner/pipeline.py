@@ -16,7 +16,7 @@ import config
 import llm_api
 import place_api
 import report
-from errors import EMPTY_RESULT, ErrorLog
+from errors import AUTH_ERROR, EMPTY_RESULT, QUOTA_ERROR, ErrorLog
 
 KST = timezone(timedelta(hours=9))
 TOTAL_STEPS = 3
@@ -84,13 +84,22 @@ def run(date, cities=3, count=5, use_cache=True, emit=print_event):
         # [2/3] 지역별 맛집 검색 — 실패·0건이어도 계속 진행
         step(2, "맛집 검색 중(Kakao Local)...")
         places_by_city = {}
+        stop = None   # 인증·쿼터 실패면 같은 키로 나머지 지역도 실패하므로 호출을 멈춘다
         for c in recommendation["recommended_cities"]:
             city = c["city"]
+            if stop:
+                errors.add(place_api.STEP, stop, f"앞 지역의 {stop} 로 검색 생략 (query={city} 맛집)")
+                log(2, "warn", f"{city}: 앞 지역에서 {stop} — 같은 키라 검색을 건너뜁니다 (데이터 없음)")
+                places_by_city[city] = []
+                continue
+            before = len(errors)
             places = place_api.search_restaurants(
                 city, count, errors, log=lambda t, city=city: log(2, "warn", f"{city}: {t}"))
             places_by_city[city] = places
             if places:
                 log(2, "info", f"{city}: 맛집 {len(places)}곳 검색 완료")
+            elif len(errors) > before and errors.items[-1]["type"] in (AUTH_ERROR, QUOTA_ERROR):
+                stop = errors.items[-1]["type"]
 
         report.save_raw(raw_file, _raw(date, cities, count, recommendation, places_by_city, errors))
 
