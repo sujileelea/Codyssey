@@ -1,4 +1,4 @@
-"""국내 여행 추천 CLI — LLM(Gemini) + 지도(Kakao Local) API 조합.
+"""국내 여행 추천 CLI — LLM(Gemini) + 지도/장소 검색(Kakao Local 기본 · Naver 선택) API 조합.
 
     python3 travel_planner.py -date "YYYY-MM-DD" [--cities N] [--count N] [--no-cache]
 
@@ -41,10 +41,21 @@ def valid_count(text):
     return value
 
 
+EPILOG = """예시:
+  python3 travel_planner.py -date "2026-10-03"                  # 3개 지역 · 지역당 맛집 5곳
+  python3 travel_planner.py -date 2026-12-24 --cities 1 --count 3
+  python3 travel_planner.py -date 2026-10-03 --no-cache         # 저장된 결과 무시하고 다시 호출
+
+결과: results/<날짜>_raw.json(원본) · results/<날짜>_travel_plan.md(리포트)
+종료 코드: 0 완료 · 1 키 미설정/1차 추천 실패/저장 실패 · 2 입력 형식 오류 · 130 Ctrl+C 중단"""
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="travel_planner.py",
         description="여행 날짜를 입력하면 LLM 이 지역을 추천하고, 지도 API 로 맛집을 찾아 여행 리포트를 만든다.",
+        epilog=EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("-date", "--date", required=True, type=valid_date, metavar='"YYYY-MM-DD"',
                         help="여행 날짜 (필수)")
