@@ -15,7 +15,6 @@ NAME = "naver_local_search"
 LABEL = "Naver Local"
 URL = "https://openapi.naver.com/v1/search/local.json"
 MAX_SIZE = 5                       # display 상한
-KEY_NAMES = ("NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET")
 STATUS_HINTS = {
     401: "인증 실패(401). Client ID/Secret 값과 헤더 이름(X-Naver-Client-Id/Secret)을 확인하세요.",
     403: "권한 없음(403). 애플리케이션의 '검색' API 사용 설정을 확인하세요.",

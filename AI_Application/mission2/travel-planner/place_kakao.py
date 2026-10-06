@@ -14,7 +14,6 @@ NAME = "kakao_local_keyword"
 LABEL = "Kakao Local"
 URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
 MAX_SIZE = 15                      # size 상한
-KEY_NAMES = ("KAKAO_REST_API_KEY",)
 STATUS_HINTS = {
     401: "인증 실패(401). 키 설정을 확인하세요.",
     403: "권한 없음(403). 카카오맵 활성화 설정·앱 권한을 확인하세요.",

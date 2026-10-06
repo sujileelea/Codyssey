@@ -568,3 +568,14 @@ def test_report_prompt_carries_search_links(monkeypatch):
     llm_api.write_report("2026-10-03", rec, {"제주": [{"name": "A"}], "강릉": []}, {"강릉": "https://map.kakao.com/?q=x"})
     assert "https://map.kakao.com/?q=x" in sent[0]["contents"][0]["parts"][0]["text"]
 
+
+def test_key_guide_detects_empty_shell_variable(monkeypatch, tmp_path, capsys):
+    env = tmp_path / ".env"
+    env.write_text("GEMINI_API_KEY=from-file\n", encoding="utf-8")
+    monkeypatch.setattr(config, "ENV_FILE", str(env))
+    monkeypatch.setattr(config, "GEMINI_API_KEY", "")
+    monkeypatch.setenv("GEMINI_API_KEY", "")            # export GEMINI_API_KEY="" 상태
+    with pytest.raises(SystemExit):
+        config.require_keys()
+    assert "unset GEMINI_API_KEY" in capsys.readouterr().err
+

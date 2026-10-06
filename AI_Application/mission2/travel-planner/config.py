@@ -6,7 +6,7 @@
 import os
 import sys
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ENV_FILE = os.path.join(BASE_DIR, ".env")
@@ -48,6 +48,18 @@ API 키가 설정되지 않았습니다: {{missing}}{{state}}
 """
 
 
+def _missing_reason(missing):
+    """키가 비어 있는 이유를 한 줄로 — 고칠 곳이 셸인지 .env 인지 바로 보이게."""
+    if not os.path.exists(ENV_FILE):
+        return "\n  → .env 파일이 없습니다"
+    in_file = dotenv_values(ENV_FILE)
+    shadowed = [name for name in missing if (in_file.get(name) or "").strip() and name in os.environ]
+    if shadowed:
+        # override=False 라 셸에 빈 값으로 export 된 변수가 .env 값을 가린다
+        return f"\n  → 셸 환경변수가 빈 값이라 .env 의 값을 가립니다. 해제: unset {' '.join(shadowed)}"
+    return "\n  → .env 파일은 있지만 위 키의 값이 비어 있습니다 (템플릿을 복사만 했거나 덮어쓴 경우)"
+
+
 def missing_keys():
     """비어 있는 필수 키 이름 목록 — Gemini + 고른 장소 검색 제공자의 키."""
     names = ("GEMINI_API_KEY",) + PROVIDER_KEYS.get(PLACE_PROVIDER, ())
@@ -62,7 +74,5 @@ def require_keys():
         sys.exit(1)
     missing = missing_keys()
     if missing:
-        # .env 는 있는데 값이 비어 있는 경우(템플릿을 그대로 복사했거나 덮어쓴 경우)를 따로 알린다
-        state = "\n  → .env 파일은 있지만 위 키의 값이 비어 있습니다" if os.path.exists(ENV_FILE) else "\n  → .env 파일이 없습니다"
-        print(KEY_GUIDE.format(missing=", ".join(missing), state=state), file=sys.stderr)
+        print(KEY_GUIDE.format(missing=", ".join(missing), state=_missing_reason(missing)), file=sys.stderr)
         sys.exit(1)
