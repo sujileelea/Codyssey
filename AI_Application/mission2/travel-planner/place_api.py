@@ -14,6 +14,7 @@ from errors import EMPTY_RESULT, PARSE_ERROR, classify_exception, classify_http
 
 KAKAO_URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
 STEP = "place_search"
+MAX_SIZE = 15  # Kakao 키워드 검색 size 상한
 
 
 def _to_float(value):
@@ -39,7 +40,7 @@ def _normalize(document):
 def search_restaurants(city, count, errors, log=print):
     """`<city> 맛집` 키워드로 count 곳을 검색해 목록을 돌려준다 (실패·0건이면 [])."""
     query = f"{city} 맛집"
-    params = {"query": query, "size": max(1, min(count, 15)), "category_group_code": "FD6"}
+    params = {"query": query, "size": max(1, min(count, MAX_SIZE)), "category_group_code": "FD6"}
     headers = {"Authorization": f"KakaoAK {config.KAKAO_REST_API_KEY}"}
 
     try:

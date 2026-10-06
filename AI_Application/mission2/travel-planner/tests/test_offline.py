@@ -48,6 +48,23 @@ def keys(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "RESULTS_DIR", str(tmp_path))
 
 
+# --- 입력 검증 ---------------------------------------------------------------
+
+@pytest.mark.parametrize("bad", ["2026-13-01", "2026-1-5", "20261003", "2026-02-30", "next week"])
+def test_date_must_be_zero_padded_yyyy_mm_dd(bad, capsys):
+    with pytest.raises(SystemExit) as exc:
+        travel_planner.build_parser().parse_args(["-date", bad])
+    assert exc.value.code == 2
+    assert "usage:" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("bad", ["0", "-1", "16", "abc"])
+def test_count_must_be_1_to_15(bad):
+    with pytest.raises(SystemExit) as exc:
+        travel_planner.build_parser().parse_args(["-date", "2026-10-03", "--count", bad])
+    assert exc.value.code == 2
+
+
 # --- 지도 API ---------------------------------------------------------------
 
 def test_kakao_auth_error_returns_empty_and_logs(monkeypatch):

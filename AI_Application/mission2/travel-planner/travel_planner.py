@@ -23,10 +23,24 @@ KST = timezone(timedelta(hours=9))
 def valid_date(text):
     """argparse 타입 검사 — YYYY-MM-DD 가 아니면 사용법과 함께 종료된다."""
     try:
-        datetime.strptime(text, "%Y-%m-%d")
+        parsed = datetime.strptime(text, "%Y-%m-%d")
     except ValueError:
+        parsed = None
+    # strptime 은 '2026-1-5' 도 받아 주므로, 파일명·캐시 키가 갈리지 않게 0 채움 형식인지도 본다
+    if parsed is None or parsed.strftime("%Y-%m-%d") != text:
         raise argparse.ArgumentTypeError(f"날짜 형식이 올바르지 않습니다: '{text}' (예: 2026-10-03)")
     return text
+
+
+def valid_count(text):
+    """argparse 타입 검사 — 지역당 맛집 수는 1~15 (Kakao 검색 size 상한)."""
+    try:
+        value = int(text)
+    except ValueError:
+        value = 0
+    if not 1 <= value <= place_api.MAX_SIZE:
+        raise argparse.ArgumentTypeError(f"맛집 수는 1~{place_api.MAX_SIZE} 사이 정수여야 합니다: '{text}'")
+    return value
 
 
 def build_parser():
@@ -38,8 +52,8 @@ def build_parser():
                         help="여행 날짜 (필수)")
     parser.add_argument("--cities", type=int, default=3, choices=[1, 2, 3],
                         help="추천 지역 수 (기본 3, 보너스: 복수 지역)")
-    parser.add_argument("--count", type=int, default=5,
-                        help="지역당 맛집 검색 수 (기본 5)")
+    parser.add_argument("--count", type=valid_count, default=5,
+                        help=f"지역당 맛집 검색 수 1~{place_api.MAX_SIZE} (기본 5)")
     parser.add_argument("--no-cache", action="store_true",
                         help="같은 날짜의 저장된 원본 JSON 이 있어도 API 를 다시 호출한다")
     return parser
