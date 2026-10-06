@@ -17,6 +17,8 @@ load_dotenv(ENV_FILE, override=False)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY", "").strip()
+# 선택 — 웹 화면의 카카오 지도용 JavaScript 키(브라우저에 공개되는 키). 없으면 OpenStreetMap 으로 표시
+KAKAO_JS_KEY = os.getenv("KAKAO_JS_KEY", "").strip()
 
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
 REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT", "60"))
