@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>국내 여행 추천</title>
+  <meta name="description" content="여행 날짜를 고르면 LLM이 지역을 추천하고 지도 API로 맛집을 찾아 여행 리포트를 만듭니다.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2a10 10 0 0 0-10 10c0 7.5 10 18 10 18s10-10.5 10-18A10 10 0 0 0 16 2z' fill='%232563eb'/%3E%3Ccircle cx='16' cy='12' r='4' fill='white'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+
+  <header class="top">
+    <div class="wrap">
+      <h1>국내 여행 추천</h1>
+      <p class="sub">날짜를 고르면 <strong>LLM</strong>이 지역을 추천하고, <strong>지도 API</strong>로 맛집을 찾아 여행 리포트를 만듭니다.</p>
+    </div>
+  </header>
+
+  <main id="main" class="wrap layout">
+    <aside class="side">
+      <section class="card" aria-labelledby="form-title">
+        <h2 id="form-title">여행 조건</h2>
+        <form id="plan-form" novalidate>
+          <fieldset id="form-fields" class="plain">
+            <div class="field">
+              <label for="date">여행 날짜</label>
+              <input type="date" id="date" name="date" required aria-describedby="date-help date-error">
+              <p id="date-help" class="help">추천은 그 시기의 일반적인 날씨·행사를 기준으로 합니다</p>
+              <p id="date-error" class="field-error" hidden></p>
+            </div>
+
+            <fieldset class="field">
+              <legend>추천 지역 수</legend>
+              <div class="seg" role="radiogroup" aria-describedby="cities-error">
+                <input type="radio" name="cities" id="cities-1" value="1"><label for="cities-1">1곳</label>
+                <input type="radio" name="cities" id="cities-2" value="2"><label for="cities-2">2곳</label>
+                <input type="radio" name="cities" id="cities-3" value="3" checked><label for="cities-3">3곳</label>
+              </div>
+              <p id="cities-error" class="field-error" hidden></p>
+            </fieldset>
+
+            <div class="field">
+              <label for="count">지역당 맛집 수</label>
+              <input type="number" id="count" name="count" min="1" max="15" value="5" inputmode="numeric"
+                     required aria-describedby="count-help count-error">
+              <p id="count-help" class="help">1~15곳</p>
+              <p id="count-error" class="field-error" hidden></p>
+            </div>
+
+            <label class="check">
+              <input type="checkbox" id="no-cache">
+              <span>저장된 결과가 있어도 새로 생성</span>
+            </label>
+          </fieldset>
+
+          <button type="submit" id="submit" class="primary">
+            <span class="spinner" aria-hidden="true"></span>
+            <span class="label">추천 받기</span>
+          </button>
+          <p id="form-error" class="form-error" role="alert" hidden></p>
+        </form>
+      </section>
+
+      <section class="card" aria-labelledby="history-title">
+        <div class="card-head">
+          <h2 id="history-title">저장된 결과</h2>
+          <button type="button" id="history-refresh" class="icon-btn" aria-label="저장된 결과 새로 고침" title="새로 고침">↻</button>
+        </div>
+        <p class="help">API 호출 없이 다시 봅니다</p>
+        <ul id="history" class="history" aria-live="polite"></ul>
+      </section>
+    </aside>
+
+    <div class="content">
+      <section id="welcome" class="card welcome" aria-labelledby="welcome-title">
+        <h2 id="welcome-title">이렇게 동작합니다</h2>
+        <ol class="flow">
+          <li><span class="flow-no">1</span><div><strong>지역 추천</strong><p>Gemini가 그 날짜에 여행하기 좋은 지역과 날씨·행사를 JSON으로 답합니다</p></div></li>
+          <li><span class="flow-no">2</span><div><strong>맛집 검색</strong><p>추천 지역마다 Kakao Local로 맛집을 찾습니다 — 실패해도 멈추지 않습니다</p></div></li>
+          <li><span class="flow-no">3</span><div><strong>여행 리포트</strong><p>Gemini가 추천·맛집을 묶어 1일 일정이 담긴 리포트를 씁니다</p></div></li>
+        </ol>
+        <p class="help">결과는 <code>results/</code> 폴더에 원본 JSON과 Markdown 리포트로 저장됩니다.</p>
+      </section>
+
+      <section id="progress" class="card" aria-labelledby="progress-title" hidden>
+        <div class="card-head">
+          <h2 id="progress-title">진행 상황</h2>
+          <span id="elapsed" class="meta" aria-hidden="true"></span>
+        </div>
+        <ol class="steps">
+          <li data-step="1" class="is-wait"><span class="dot" aria-hidden="true"></span>
+            <span class="step-text"><span class="step-name">지역 추천</span><small>LLM</small></span>
+            <span class="state">대기</span></li>
+          <li data-step="2" class="is-wait"><span class="dot" aria-hidden="true"></span>
+            <span class="step-text"><span class="step-name">맛집 검색</span><small>지도 API</small></span>
+            <span class="state">대기</span></li>
+          <li data-step="3" class="is-wait"><span class="dot" aria-hidden="true"></span>
+            <span class="step-text"><span class="step-name">리포트 작성</span><small>LLM</small></span>
+            <span class="state">대기</span></li>
+        </ol>
+        <ul id="log" class="log" aria-live="polite" aria-label="진행 로그"></ul>
+      </section>
+
+      <section id="result" aria-labelledby="result-title" hidden>
+        <div class="card result-head">
+          <div>
+            <h2 id="result-title" tabindex="-1"></h2>
+            <p id="result-meta" class="meta"></p>
+          </div>
+          <div class="actions">
+            <button type="button" id="dl-md" class="ghost">리포트 .md 저장</button>
+            <button type="button" id="dl-json" class="ghost">원본 .json 저장</button>
+          </div>
+        </div>
+
+        <div id="alerts"></div>
+
+        <div class="result-grid">
+          <article id="report" class="card report" aria-label="여행 리포트"></article>
+
+          <section class="card map-card" aria-labelledby="places-title">
+            <div class="card-head">
+              <h3 id="places-title">맛집 지도</h3>
+              <span id="map-note" class="meta"></span>
+            </div>
+            <div id="city-filter" class="chips" role="group" aria-label="지역 선택"></div>
+            <div id="map" class="map" role="region" aria-label="맛집 위치 지도"></div>
+            <div id="places" class="places"></div>
+          </section>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="wrap foot">
+    LLM: Google Gemini · 장소 검색: Kakao Local · 지도: 카카오맵 / © OpenStreetMap contributors
+  </footer>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
