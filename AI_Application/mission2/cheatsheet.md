@@ -35,7 +35,6 @@ cd travel-planner
 | 8 | `KAKAO_REST_API_KEY=wrongkey python3 travel_planner.py -date 2026-12-24` | 401 → 맛집 `데이터 없음` → 리포트 계속 생성 → 오류 요약·조치 안내 | 1-③ · 3-③ |
 | 9 | `python3 -m pytest tests -q` | 깨진 JSON 재시도 1회 · 0건 · 503 대체 리포트 등 오류 경로 전부 통과 | 4-①② |
 | 10 | `git status --short .` → `git ls-files . \| xargs grep -nE "AIza\|AQ\.[0-9A-Za-z_-]{20,}\|KakaoAK [0-9a-f]{32}"` | `.env` 미추적 · 키 패턴 0건 | 1-⑤ |
-
 | 11 | (추가) `python3 web.py` → 브라우저 `http://localhost:8000` | 같은 파이프라인의 웹 화면 — 저장된 결과 `2027-03-15` 클릭 · 진행 표시 · 맛집 지도 | 2-① |
 
 - 4번은 샘플에 없는 날짜 사용 — 샘플 날짜면 캐시가 먼저 동작
