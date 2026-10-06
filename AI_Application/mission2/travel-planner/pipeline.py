@@ -16,7 +16,7 @@ import config
 import llm_api
 import place_api
 import report
-from errors import AUTH_ERROR, EMPTY_RESULT, QUOTA_ERROR, ErrorLog
+from errors import AUTH_ERROR, EMPTY_RESULT, IO_ERROR, QUOTA_ERROR, ErrorLog
 
 KST = timezone(timedelta(hours=9))
 TOTAL_STEPS = 3
@@ -36,11 +36,12 @@ def run(date, cities=3, count=5, use_cache=True, emit=print_event):
     """파이프라인을 실행하고 결과를 dict 로 돌려준다.
 
     ok=False 는 1차 추천 실패처럼 리포트를 만들 수 없었던 경우다.
+    saved=False 는 결과 파일 저장에 실패한 경우다 (리포트 본문은 markdown 에 있다).
     """
     errors = ErrorLog()
-    os.makedirs(config.RESULTS_DIR, exist_ok=True)
     raw_file = report.raw_path(config.RESULTS_DIR, date)
     report_file = report.report_path(config.RESULTS_DIR, date)
+    failed_paths = set()
 
     def log(step, level, text):
         emit({"kind": "log", "step": step, "level": level, "text": text})
@@ -50,6 +51,19 @@ def run(date, cities=3, count=5, use_cache=True, emit=print_event):
 
     def notice(level, text):
         emit({"kind": "notice", "level": level, "text": text})
+
+    def save(write, path, data, step_no):
+        """저장 실패는 errors 에 경로당 1번만 남기고 계속 진행한다."""
+        try:
+            os.makedirs(config.RESULTS_DIR, exist_ok=True)
+            write(path, data)
+            return True
+        except OSError as exc:
+            if path not in failed_paths:
+                failed_paths.add(path)
+                errors.add("save", IO_ERROR, f"{display_path(path)} 저장 실패 — {exc.strerror or exc}")
+                log(step_no, "error", f"오류: {display_path(path)} 저장 실패 ({exc.strerror or exc})")
+            return False
 
     # 보너스: 캐싱 — 같은 날짜의 원본 JSON 이 있으면 [1/3]·[2/3] API 호출을 건너뛴다
     cached = _load_cache(raw_file, notice, cities, count) if use_cache else None
@@ -76,8 +90,8 @@ def run(date, cities=3, count=5, use_cache=True, emit=print_event):
             log(1, "error", f"오류: {exc.error_type} — {exc}")
             log(1, "error", "1차 추천을 만들지 못해 종료합니다. (원본 JSON 에 오류만 기록)")
             raw = _raw(date, cities, count, None, {}, errors)
-            report.save_raw(raw_file, raw)
-            return _result(False, date, raw_file, None, raw, None, cached=False)
+            saved = save(report.save_raw, raw_file, raw, 1)
+            return _result(False, date, raw_file, None, raw, None, cached=False, saved=saved)
         for c in recommendation["recommended_cities"]:
             log(1, "info", f'recommended_city: "{c["city"]}"')
 
@@ -101,7 +115,7 @@ def run(date, cities=3, count=5, use_cache=True, emit=print_event):
             elif len(errors) > before and errors.items[-1]["type"] in (AUTH_ERROR, QUOTA_ERROR):
                 stop = errors.items[-1]["type"]
 
-        report.save_raw(raw_file, _raw(date, cities, count, recommendation, places_by_city, errors))
+        save(report.save_raw, raw_file, _raw(date, cities, count, recommendation, places_by_city, errors), 2)
 
     # [3/3] LLM 최종 리포트 — 실패하면 데이터만으로 대체 리포트를 만든다
     step(3, "최종 리포트 생성 중(LLM)...")
@@ -114,11 +128,14 @@ def run(date, cities=3, count=5, use_cache=True, emit=print_event):
         log(3, "warn", "데이터만으로 대체 리포트를 생성합니다")
         markdown = report.fallback_report(date, recommendation, places_by_city)
     markdown = markdown.rstrip() + "\n\n" + report.errors_section(errors)
-    report.save_report(report_file, markdown)
+    report_saved = save(report.save_report, report_file, markdown, 3)
     # 리포트 단계 오류까지 포함해 원본 JSON 의 errors 를 최종 상태로 갱신
     raw = _raw(date, cities, count, recommendation, places_by_city, errors)
-    report.save_raw(raw_file, raw)
-    return _result(True, date, raw_file, report_file, raw, markdown, cached=bool(cached))
+    raw_saved = save(report.save_raw, raw_file, raw, 3)
+    if not raw_saved:
+        raw["errors"] = list(errors)   # 저장 실패 기록까지 결과에 담는다
+    return _result(True, date, raw_file, report_file, raw, markdown, cached=bool(cached),
+                   saved=report_saved and raw_saved)
 
 
 def _load_cache(raw_file, notice, cities, count):
@@ -175,8 +192,8 @@ def _raw(date, cities, count, recommendation, places_by_city, errors):
     }
 
 
-def _result(ok, date, raw_file, report_file, raw, markdown, cached):
-    return {"ok": ok, "date": date, "raw_path": raw_file, "report_path": report_file,
+def _result(ok, date, raw_file, report_file, raw, markdown, cached, saved):
+    return {"ok": ok, "saved": saved, "date": date, "raw_path": raw_file, "report_path": report_file,
             "raw": raw, "markdown": markdown, "cached": cached}
 
 

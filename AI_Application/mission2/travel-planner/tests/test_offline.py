@@ -385,3 +385,38 @@ def test_auth_error_skips_remaining_cities(monkeypatch, tmp_path):
     assert [e["type"] for e in raw["errors"]] == [AUTH_ERROR, AUTH_ERROR]
     assert "검색 생략 (query=강릉 맛집)" in raw["errors"][1]["message"]
     assert raw["places"] == {"제주": [], "강릉": []}
+
+
+# --- 저장 실패 · 중단 · 예상하지 못한 오류 -----------------------------------------------
+
+def test_report_save_failure_prints_report_and_exits_1(monkeypatch, tmp_path, capsys):
+    stub_pipeline(monkeypatch, lambda: FakeResponse(200, {"documents": [{"place_name": "A"}]}))
+
+    def deny(path, markdown):
+        raise PermissionError(13, "Permission denied")
+    monkeypatch.setattr(report, "save_report", deny)
+    assert travel_planner.run(make_args()) == 1
+    out = capsys.readouterr().out
+    assert "저장하지 못해 리포트를 화면에 출력" in out and "# 2026-10-03 국내 여행 추천 리포트" in out
+    assert "IO_ERROR" in out and "쓰기 권한" in out
+    raw = json.load(open(tmp_path / "2026-10-03_raw.json", encoding="utf-8"))
+    assert raw["errors"][-1]["type"] == "IO_ERROR"
+
+
+def test_cli_summary_shows_hint(monkeypatch, capsys):
+    stub_pipeline(monkeypatch, lambda: FakeResponse(401, {}))
+    travel_planner.run(make_args())
+    assert "→ 키 값·권한을 확인하세요" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("exc, code, text", [(KeyboardInterrupt(), 130, "중단했습니다"),
+                                             (RuntimeError("뜻밖"), 1, "예상하지 못한 오류")])
+def test_main_handles_interrupt_and_unexpected(monkeypatch, capsys, exc, code, text):
+    def boom(*a, **k):
+        raise exc
+    monkeypatch.setattr(travel_planner.pipeline, "run", boom)
+    monkeypatch.setattr(sys, "argv", ["travel_planner.py", "-date", "2026-10-03"])
+    monkeypatch.delenv("TRAVEL_DEBUG", raising=False)
+    with pytest.raises(SystemExit) as caught:
+        travel_planner.main()
+    assert caught.value.code == code and text in capsys.readouterr().err

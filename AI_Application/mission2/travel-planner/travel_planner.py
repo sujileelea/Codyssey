@@ -7,12 +7,14 @@
 """
 
 import argparse
+import os
 import sys
 from datetime import datetime
 
 import config
 import pipeline
 import place_api
+from errors import hint
 
 
 def valid_date(text):
@@ -55,22 +57,45 @@ def build_parser():
 
 
 def run(args):
-    """CLI 실행 — 파이프라인을 돌리고 결과 경로를 안내한다. 종료 코드를 돌려준다."""
+    """CLI 실행 — 파이프라인을 돌리고 결과 경로·오류 안내를 출력한다. 종료 코드를 돌려준다."""
     result = pipeline.run(args.date, args.cities, args.count, use_cache=not args.no_cache)
     if not result["ok"]:
         return 1
     errors = result["raw"]["errors"]
-    print(f"\n완료! {pipeline.display_path(result['report_path'])} 를 확인하세요.")
-    print(f"      원본 데이터: {pipeline.display_path(result['raw_path'])}")
+    if result["saved"]:
+        print(f"\n완료! {pipeline.display_path(result['report_path'])} 를 확인하세요.")
+        print(f"      원본 데이터: {pipeline.display_path(result['raw_path'])}")
+    else:
+        print("\n결과 파일을 저장하지 못해 리포트를 화면에 출력합니다.\n")
+        print(result["markdown"])
     if errors:
         print(f"      오류 {len(errors)}건 — 리포트 끝 '오류 요약(errors)' 참고")
+        for e in errors:
+            tip = hint(e["type"])
+            print(f"        · {e['step']} {e['type']}: {e['message']}" + (f"\n          → {tip}" if tip else ""))
+    if not result["saved"]:
+        return 1
+    if not args.no_cache and result["cached"]:
+        print("      (저장된 추천·맛집을 다시 썼습니다. 새로 받으려면 --no-cache)")
     return 0
 
 
 def main():
     args = build_parser().parse_args()   # 날짜 형식 오류 → 사용법 출력 후 종료(exit 2)
     config.require_keys()                # 키 미설정 → 설정 안내 후 종료(exit 1)
-    sys.exit(run(args))
+    try:
+        code = run(args)
+    except KeyboardInterrupt:
+        print("\n중단했습니다 (Ctrl+C). 이미 저장된 단계의 결과는 results/ 에 남아 있습니다.", file=sys.stderr)
+        code = 130
+    except Exception as exc:   # 예상하지 못한 오류 — 추적 정보 대신 요약과 다음 행동을 안내
+        if os.getenv("TRAVEL_DEBUG"):
+            raise
+        print(f"\n예상하지 못한 오류로 중단했습니다: {type(exc).__name__}: {exc}", file=sys.stderr)
+        print("--no-cache 로 다시 실행해 보고, 반복되면 TRAVEL_DEBUG=1 을 붙여 상세 정보를 확인하세요.",
+              file=sys.stderr)
+        code = 1
+    sys.exit(code)
 
 
 if __name__ == "__main__":
