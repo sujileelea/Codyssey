@@ -106,6 +106,30 @@ $ python3 travel_planner.py -date "2027-03-15"
 | `2026-10-03` · `2026-11-07` | 정상 — 3지역 · 맛집 15곳 (초기 버전 실행, 읽을 때 현재 형식으로 맞춤) |
 | `2026-12-24` | 지도 API 인증 실패(잘못된 키) — 맛집 `데이터 없음` · `AUTH_ERROR` |
 
+## 웹 화면 (선택)
+
+- CLI 와 **같은 파이프라인**을 브라우저에서 실행·조회하는 로컬 화면 (과제 필수는 CLI, 웹은 추가 기능)
+
+```bash
+python3 web.py                  # → http://localhost:8000  (종료: Ctrl+C, 다른 포트: --port 8001)
+```
+
+| 기능 | 내용 |
+| --- | --- |
+| 조건 입력 | 날짜 · 지역 수(1~3) · 지역당 맛집 수 · 저장 결과 무시 — CLI 와 같은 검증, 틀린 칸에 바로 안내 |
+| 진행 표시 | 3단계(지역 추천 · 맛집 검색 · 리포트 작성)의 진행 중/완료/캐시/경고/실패 + 실시간 로그 · 경과 시간 |
+| 결과 | 리포트 · 맛집 지도(지역별 색 핀, 지역 필터, 목록과 연동) · 오류 유형별 조치 안내 · `.md`/`.json` 내려받기 |
+| 저장된 결과 | `results/` 의 지난 결과를 API 호출 없이 다시 보기 |
+| 지도 | `.env` 에 `KAKAO_JS_KEY`(카카오 **JavaScript 키**) + 카카오 콘솔 → 플랫폼 → Web 에 `http://localhost:8000` 등록 시 카카오맵, 없거나 실패하면 OpenStreetMap |
+
+| 요청 | 용도 |
+| --- | --- |
+| `GET /api/config` · `GET /api/results` · `GET /api/results/<날짜>` | 조회 — 설정 · 저장 결과 목록 · 상세 |
+| `POST /api/plan` | 생성 — 본문 `{date, cities, count, no_cache}` → 진행 이벤트를 한 줄씩(NDJSON) 보내고 마지막 줄이 결과 |
+
+- 기본 `127.0.0.1` 에서만 열림(이 컴퓨터만 접속) · 생성은 한 번에 1건(동시 요청 409) · REST/Gemini 키는 화면으로 내보내지 않음(카카오 JavaScript 키는 원래 브라우저용 공개 키)
+- 표준 라이브러리 `http.server` + 순수 HTML/CSS/JS — 추가 설치 없음
+
 ## 오류 처리 정책
 
 | 상황 | 동작 | `errors` 기록 |
@@ -134,7 +158,8 @@ $ python3 travel_planner.py -date "2027-03-15"
 | `place_kakao.py` · `place_naver.py` | 제공자별 요청 모양·응답 정리만 (Kakao 기본, `PLACE_PROVIDER=naver` 로 교체) |
 | `report.py` | 원본 JSON · 리포트 저장, 오류 요약 섹션, 대체 리포트, 예전 결과 파일 형식 맞춤 |
 | `errors.py` · `net.py` · `config.py` | 오류 유형·조치 안내·`ErrorLog` / 일시 오류 1회 재시도 / `.env` 로드·키 확인 |
-| `tests/` | 네트워크 없이 정상·오류 경로 검증 (`python3 -m pytest tests -q`) |
+| `web.py` · `web/` | (선택) 로컬 웹 화면 — 같은 `pipeline.run()` 을 브라우저에서 |
+| `tests/` | 네트워크 없이 정상·오류 경로·웹 서버 검증 (`python3 -m pytest tests -q`) |
 
 - **GET vs POST** — Kakao 검색은 "조회"라 검색어를 URL 쿼리스트링에 실어 **GET**, Gemini 는 프롬프트·스키마를 요청 **본문(JSON)** 에 담아 보내야 하므로 **POST**. 인증은 둘 다 헤더(`Authorization: KakaoAK …` / `x-goog-api-key: …`)
 - **JSON 강제** — `responseMimeType: application/json` + `responseSchema`(필수 4키·`events` 1~3개) → `json.loads` → 키·타입 검사. 자유 텍스트는 매번 모양이 달라 다음 단계(장소 검색)의 입력으로 쓸 수 없다

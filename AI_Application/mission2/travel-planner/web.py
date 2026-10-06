@@ -270,13 +270,13 @@ def main():
         sys.exit(1)
     local = args.host in ("127.0.0.1", "localhost", "::1")
     url = f"http://localhost:{args.port}" if local else f"http://{args.host}:{args.port}"
-    print(f"여행 추천 웹 화면: {url}   (종료: Ctrl+C)")
+    print(f"여행 추천 웹 화면: {url}   (종료: Ctrl+C)", flush=True)
     if not local:
-        print("  주의: 이 컴퓨터 밖에서도 접속할 수 있습니다 — 누구나 내 API 키로 호출하게 됩니다")
+        print("  주의: 이 컴퓨터 밖에서도 접속할 수 있습니다 — 누구나 내 API 키로 호출하게 됩니다", flush=True)
     if config.KAKAO_JS_KEY:
-        print(f"  지도: 카카오 지도 (카카오 콘솔 → 플랫폼 → Web 에 {url} 등록 필요, 실패 시 OpenStreetMap)")
+        print(f"  지도: 카카오 지도 (카카오 콘솔 → 플랫폼 → Web 에 {url} 등록 필요, 실패 시 OpenStreetMap)", flush=True)
     else:
-        print("  지도: OpenStreetMap (카카오 지도를 쓰려면 .env 에 KAKAO_JS_KEY)")
+        print("  지도: OpenStreetMap (카카오 지도를 쓰려면 .env 에 KAKAO_JS_KEY)", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

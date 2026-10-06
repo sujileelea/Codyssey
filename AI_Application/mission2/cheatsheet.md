@@ -36,6 +36,8 @@ cd travel-planner
 | 9 | `python3 -m pytest tests -q` | 깨진 JSON 재시도 1회 · 0건 · 503 대체 리포트 등 오류 경로 전부 통과 | 4-①② |
 | 10 | `git status --short .` → `git ls-files . \| xargs grep -nE "AIza\|AQ\.[0-9A-Za-z_-]{20,}\|KakaoAK [0-9a-f]{32}"` | `.env` 미추적 · 키 패턴 0건 | 1-⑤ |
 
+| 11 | (추가) `python3 web.py` → 브라우저 `http://localhost:8000` | 같은 파이프라인의 웹 화면 — 저장된 결과 `2027-03-15` 클릭 · 진행 표시 · 맛집 지도 | 2-① |
+
 - 4번은 샘플에 없는 날짜 사용 — 샘플 날짜면 캐시가 먼저 동작
 - 시간이 없으면 4번 대신 `results/2027-03-15_*` 샘플로 설명
 
@@ -51,7 +53,7 @@ cd travel-planner
   · [2/3] 지역마다 `place_api.search_restaurants()` → `places_by_city`
   · [3/3] `llm_api.write_report()` → Markdown → `report.save_raw()` · `save_report()`
 - 단계 사이 데이터 = 파이썬 dict — 앞 단계 출력이 곧 다음 단계 입력 (`recommended_city` → 검색어)
-- 진행 출력은 `emit` 콜백으로 분리 — CLI 는 `print`, 다른 화면도 같은 흐름 재사용 가능
+- 진행 출력은 `emit` 콜백으로 분리 — CLI 는 `print`, 웹(`web.py`)은 같은 이벤트를 브라우저로 스트리밍 → 흐름 코드 1벌을 두 화면이 공유
 - 공통 관심사는 별도 모듈 — `errors`(오류 목록) · `net`(재시도) · `config`(키) · `report`(저장·대체 리포트)
 - 장점: 단계별 단독 테스트(가짜 응답) · 제공자 교체 · 재사용
 
@@ -101,6 +103,7 @@ cd travel-planner
   · 긴 프롬프트·JSON 스키마·생성 설정을 요청 본문(JSON)으로 전달 — URL 에 담을 수 없는 크기·구조
   · 호출마다 새 결과 생성(비멱등)·과금 대상
 - 인증은 둘 다 헤더 — `Authorization: KakaoAK <키>` · `x-goog-api-key: <키>` (URL 에 키를 넣지 않음)
+- 웹 서버도 같은 기준 — 조회 `GET /api/results` · 생성(API 호출·파일 저장) `POST /api/plan`
 
 ### 3-6. LLM 출력을 JSON 으로 강제한 이유와 장점 (항목 3)
 
