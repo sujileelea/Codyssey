@@ -15,6 +15,7 @@ mission1/
 ├── 과제 요약.md               과제 요구사항 · 체크리스트 · 핵심 개념
 ├── 실행 로그.md               환경 · 데이터 탐색/수집 · 분석 · 고친 오류 · 재현 확인 기록
 ├── 평가 지침.md               평가자용 확인 순서 · 대시보드 시연 · 설명 질문 대응
+├── cheatsheet.md             평가 시연 명령 순서 · 설명할 내용 · 예상 꼬리 질문
 ├── requirements.txt          의존성(버전 고정)
 ├── collect.py                데이터 수집(Google Trends · Wikimedia Pageviews)
 ├── analysis.py               정제 · 분석 · 그림 9장 · 표
