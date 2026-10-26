@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
+  <script defer src="/_vercel/insights/script.js"></script>
+  <title>FAQ — AITAG 시연</title>
+</head>
+<body>
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="index.html"><span class="logo" aria-hidden="true">Aa</span>AITAG 시연 <small>대체텍스트 생성</small></a>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav" aria-label="메뉴 열기">☰</button>
+      <nav class="nav" id="nav" aria-label="주요 메뉴">
+        <a href="index.html">홈</a>
+        <a href="demo.html">시연</a>
+        <a href="matrix.html">프롬프트 매트릭스</a>
+        <a href="faq.html">FAQ</a>
+      </nav>
+      <button class="theme-toggle" type="button" aria-label="다크 모드로 전환">🌙</button>
+    </div>
+  </header>
+  <main id="main" class="container">
+    <h1>자주 묻는 질문</h1>
+    <div class="faq">
+      <details open><summary>대체텍스트(alt text)가 뭔가요?</summary><p>이미지를 볼 수 없는 사람에게 스크린리더가 대신 읽어 주는 글입니다. HTML 의 <code>&lt;img alt="…"&gt;</code> 속성에 들어가며, 비어 있으면 "이미지"라고만 읽힙니다. 검색엔진과 이미지 로딩 실패 시에도 쓰입니다.</p></details>
+      <details><summary>올린 사진은 어디에 저장되나요?</summary><p>저장되지 않습니다. 브라우저가 사진을 줄여 서버 함수에 보내고, 함수는 그것을 AI 에 전달한 뒤 응답만 돌려줍니다. 서버에 파일을 쓰지 않고, 데이터베이스도 없습니다.</p></details>
+      <details><summary>결과가 이상하거나 틀렸어요.</summary><p>AI 는 이미지에 보이는 것만 쓰도록 지시받지만 작은 글자·복잡한 표·저해상도 사진에서는 오독할 수 있습니다. 이미지 유형(긴 글·상세 이미지)을 정확히 고르고, 컨텍스트에 제목을 적어 주면 좋아집니다. 시연 결과는 검수 전 초안으로 다루세요.</p></details>
+      <details><summary>"지금 요청이 많습니다"가 떠요.</summary><p>무료 AI 한도(분당 호출 수)에 걸린 상태입니다. 1분 뒤 다시 시도하면 됩니다. 응답이 30초 넘게 오지 않으면 화면에 지연 안내가 뜨고, 그때도 다시 시도하면 됩니다.</p></details>
+      <details><summary>어떤 기술로 만들어졌나요?</summary><p>프론트는 순수 HTML/CSS/JavaScript(프레임워크 없음), 백엔드는 Vercel Serverless Functions(Python)의 <code>/api/options</code>(GET)와 <code>/api/alt_text</code>(POST), AI 는 Google Gemini 입니다. API 키는 서버 환경 변수에만 있고 브라우저로 내려오지 않습니다.</p></details>
+      <details><summary>다크 모드는 어떻게 켜나요?</summary><p>오른쪽 위 🌙/☀️ 버튼입니다. 처음엔 기기 설정을 따르고, 한 번 고르면 브라우저에 기억됩니다.</p></details>
+      <details><summary>실제 AITAG 서비스와 같은가요?</summary><p>아닙니다. 이 페이지는 "프롬프트 매트릭스로 대체텍스트를 만든다"는 개념을 보여 주는 <strong>시연용 데모</strong>이며, 프롬프트와 축 정의는 데모용으로 새로 작성한 것입니다.</p></details>
+    </div>
+  </main>
+  <footer class="site-footer">
+    <div class="container">
+      <span>AITAG 시연 — 사진과 프롬프트 매트릭스로 대체텍스트를 만드는 데모</span>
+      <span>Vercel Serverless Functions(Python) + Gemini · 프론트는 순수 HTML/CSS/JS</span>
+    </div>
+  </footer>
+  <script src="js/common.js"></script>
+</body>
+</html>

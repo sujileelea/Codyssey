@@ -1,0 +1,86 @@
+{
+  "files": {
+    "trends_us_weekly.csv": {
+      "source": "Google Trends (pytrends 비공식 클라이언트)",
+      "role": "주 데이터 — 미국 'AI 쇼핑' 계열 검색어 5종",
+      "keywords": [
+        "AI shopping",
+        "AI shopping assistant",
+        "ChatGPT shopping",
+        "agentic commerce",
+        "Amazon Rufus"
+      ],
+      "geo": "US",
+      "timeframe": "2021-10-24 2026-10-25",
+      "rows": 262,
+      "fetched_at": "2026-10-26T08:01:07+00:00"
+    },
+    "trends_us_controls_longtail.csv": {
+      "source": "Google Trends (pytrends 비공식 클라이언트)",
+      "role": "대조 — 'AI shopping' 과 비슷한 규모의 비(非)AI 쇼핑 검색어",
+      "keywords": [
+        "AI shopping",
+        "online shopping",
+        "price comparison",
+        "shopping list"
+      ],
+      "geo": "US",
+      "timeframe": "2021-10-24 2026-10-25",
+      "rows": 262,
+      "fetched_at": "2026-10-26T08:01:29+00:00"
+    },
+    "trends_us_controls_highvol.csv": {
+      "source": "Google Trends (pytrends 비공식 클라이언트)",
+      "role": "대조 — 검색량이 큰 일반 검색어(전체 검색량 변화 확인용)",
+      "keywords": [
+        "ChatGPT",
+        "Amazon",
+        "weather"
+      ],
+      "geo": "US",
+      "timeframe": "2021-10-24 2026-10-25",
+      "rows": 262,
+      "fetched_at": "2026-10-26T08:01:51+00:00"
+    },
+    "trends_kr_weekly.csv": {
+      "source": "Google Trends (pytrends 비공식 클라이언트)",
+      "role": "비교 — 한국 'AI 쇼핑' 단독(자체 최댓값 = 100)",
+      "keywords": [
+        "AI 쇼핑"
+      ],
+      "geo": "KR",
+      "timeframe": "2021-10-24 2026-10-25",
+      "rows": 262,
+      "fetched_at": "2026-10-26T08:02:14+00:00"
+    },
+    "trends_us_daily_2026.csv": {
+      "source": "Google Trends (pytrends 비공식 클라이언트)",
+      "role": "검증 — 2026-07 급락 전후 일간 값",
+      "keywords": [
+        "AI shopping",
+        "price comparison",
+        "online shopping"
+      ],
+      "geo": "US",
+      "timeframe": "2026-05-01 2026-09-30",
+      "rows": 153,
+      "fetched_at": "2026-10-26T08:02:37+00:00"
+    },
+    "wiki_en_agentic_commerce.csv": {
+      "source": "Wikimedia Pageviews API (agent=user)",
+      "role": "교차 확인 — Google Trends 와 독립된 관심도 측정",
+      "article": "en.wikipedia/Agentic_commerce",
+      "range": "20250101~20261025",
+      "rows": 317,
+      "fetched_at": "2026-10-26T08:02:37+00:00"
+    },
+    "wiki_en_online_shopping.csv": {
+      "source": "Wikimedia Pageviews API (agent=user)",
+      "role": "교차 확인 — Google Trends 와 독립된 관심도 측정",
+      "article": "en.wikipedia/Online_shopping",
+      "range": "20250101~20261025",
+      "rows": 663,
+      "fetched_at": "2026-10-26T08:02:37+00:00"
+    }
+  }
+}

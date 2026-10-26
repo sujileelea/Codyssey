@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "functions": {
+    "api/**/*.py": {
+      "maxDuration": 30,
+      "excludeFiles": "{tests/**,scripts/**,images/**}"
+    }
+  },
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- ."
+}

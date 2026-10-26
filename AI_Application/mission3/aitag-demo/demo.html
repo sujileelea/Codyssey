@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
+  <script defer src="/_vercel/insights/script.js"></script>
+  <title>시연 — AITAG 대체텍스트 생성</title>
+</head>
+<body>
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="index.html"><span class="logo" aria-hidden="true">Aa</span>AITAG 시연 <small>대체텍스트 생성</small></a>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav" aria-label="메뉴 열기">☰</button>
+      <nav class="nav" id="nav" aria-label="주요 메뉴">
+        <a href="index.html">홈</a>
+        <a href="demo.html">시연</a>
+        <a href="matrix.html">프롬프트 매트릭스</a>
+        <a href="faq.html">FAQ</a>
+      </nav>
+      <button class="theme-toggle" type="button" aria-label="다크 모드로 전환">🌙</button>
+    </div>
+  </header>
+  <main id="main" class="container">
+    <h1>시연</h1>
+    <p class="lead">사진을 올리고 매트릭스를 고른 뒤 <strong>대체텍스트 생성</strong>을 누르세요. 사진은 AI 호출에만 쓰이고 저장되지 않습니다.</p>
+    <form id="demo-form" class="demo" novalidate>
+      <section aria-labelledby="h-photo">
+        <h2 id="h-photo">1. 사진</h2>
+        <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="사진 선택 또는 드래그 앤 드롭">
+          <div id="drop-hint" class="hint"><strong>사진을 끌어다 놓거나 클릭해서 선택</strong>JPEG · PNG · WebP · GIF · 붙여넣기(Ctrl+V)도 됩니다</div>
+          <img id="preview" alt="선택한 사진 미리보기" hidden>
+        </div>
+        <input id="file" class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/gif" aria-label="사진 파일 선택">
+        <div class="file-meta"><span id="file-meta"></span><button id="clear" class="btn btn-ghost btn-sm" type="button" hidden>사진 지우기</button></div>
+        <p class="hint" style="margin:14px 0 6px">사진이 없다면 샘플로 시연해 보세요 (누르면 매트릭스도 함께 맞춰집니다)</p>
+        <div class="actions" style="margin-top:0">
+          <button class="btn btn-ghost btn-sm sample" type="button" data-src="images/samples/poster.jpg" data-preset="public.notice.poster.event.formal">행사 포스터</button>
+          <button class="btn btn-ghost btn-sm sample" type="button" data-src="images/samples/food_label.jpg" data-preset="ecommerce.product.product_detail_image.food.plain">식품 라벨</button>
+          <button class="btn btn-ghost btn-sm sample" type="button" data-src="images/samples/chart.jpg" data-preset="education.lecture.infographic.general.friendly">인포그래픽</button>
+        </div>
+      </section>
+
+      <section aria-labelledby="h-matrix">
+        <h2 id="h-matrix">2. 프롬프트 매트릭스</h2>
+        <div id="matrix" class="matrix">
+          <div class="field"><label for="axis-domain">분야</label><select id="axis-domain" name="domain"></select></div>
+          <div class="field"><label for="axis-content_type">콘텐츠 유형</label><select id="axis-content_type" name="content_type"></select></div>
+          <div class="field"><label for="axis-image_kind">이미지 유형</label><select id="axis-image_kind" name="image_kind"></select></div>
+          <div class="field"><label for="axis-category">카테고리</label><select id="axis-category" name="category"></select></div>
+          <div class="field"><label for="axis-tone">톤</label><select id="axis-tone" name="tone"></select></div>
+          <div class="field"><label for="axis-length">길이</label><select id="axis-length" name="length"></select></div>
+          <div class="field"><label for="axis-language">언어</label><select id="axis-language" name="language"></select></div>
+          <div class="field wide"><label for="context">컨텍스트 (선택) — 이미지가 쓰이는 제목·캡션</label><input id="context" type="text" maxlength="500" placeholder="예: 2026 가을 신상품 런칭 안내 / 결승전 승리 순간"></div>
+        </div>
+        <div class="key-preview">매트릭스 키 <span id="key-preview" class="chip">…</span></div>
+        <div class="submit-row">
+          <button id="submit" class="btn btn-primary" type="submit">대체텍스트 생성</button>
+          <span id="status" class="status" role="status" aria-live="polite"></span>
+        </div>
+        <div id="alert" class="alert alert-error" role="alert" tabindex="-1" data-show="false"></div>
+      </section>
+    </form>
+
+    <section id="result" class="result section" data-show="false" aria-live="polite" aria-labelledby="h-result">
+      <div class="card">
+        <div class="result-head">
+          <h2 id="h-result" style="margin:0">결과</h2>
+          <span><span id="r-key" class="chip"></span> <span id="r-time" class="chip chip-accent"></span></span>
+        </div>
+        <div class="alt-box" id="r-alt"></div>
+        <div class="submit-row"><button id="copy" class="btn btn-ghost btn-sm" type="button">대체텍스트 복사</button><span id="copied" class="copied" aria-live="polite"></span></div>
+        <div id="r-replaced" class="alert alert-warn" data-show="false"></div>
+        <dl>
+          <dt>HTML 에 넣으면</dt><dd><code id="r-html"></code></dd>
+          <dt>보충 설명 (long description)</dt><dd id="r-long"></dd>
+          <dt>이미지 안에 적힌 글</dt><dd id="r-text"></dd>
+          <dt>장식용 이미지인가</dt><dd id="r-deco"></dd>
+          <dt>합성에 쓰인 프롬프트 블록</dt><dd><div id="r-blocks" class="blocks"></div></dd>
+        </dl>
+        <details><summary>실제로 보낸 프롬프트 보기</summary><pre id="r-prompt"></pre></details>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <div class="container">
+      <span>AITAG 시연 — 사진과 프롬프트 매트릭스로 대체텍스트를 만드는 데모</span>
+      <span>Vercel Serverless Functions(Python) + Gemini · 프론트는 순수 HTML/CSS/JS</span>
+    </div>
+  </footer>
+  <script src="js/common.js"></script>
+  <script src="js/demo.js"></script>
+</body>
+</html>

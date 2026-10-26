@@ -1,0 +1,93 @@
+"""결과 저장 — 원본 JSON · 최종 리포트 Markdown · 대체 리포트."""
+
+import json
+import os
+
+
+def raw_path(results_dir, date):
+    return os.path.join(results_dir, f"{date}_raw.json")
+
+
+def report_path(results_dir, date):
+    return os.path.join(results_dir, f"{date}_travel_plan.md")
+
+
+def save_raw(path, raw):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(raw, f, ensure_ascii=False, indent=2)
+
+
+def load_raw(path):
+    with open(path, encoding="utf-8") as f:
+        return upgrade_raw(json.load(f))
+
+
+def upgrade_raw(raw):
+    """예전 형식(recommended_cities 항목의 지역명 키가 city)을 지금 형식(recommended_city)으로 맞춘다."""
+    recommendation = raw.get("recommendation") if isinstance(raw, dict) else None
+    if isinstance(recommendation, dict) and isinstance(recommendation.get("recommended_cities"), list):
+        recommendation["recommended_cities"] = [
+            {"recommended_city": c["city"], **{k: v for k, v in c.items() if k != "city"}}
+            if isinstance(c, dict) and "city" in c and "recommended_city" not in c else c
+            for c in recommendation["recommended_cities"]
+        ]
+    return raw
+
+
+def save_report(path, markdown):
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(markdown.rstrip() + "\n")
+
+
+def errors_section(errors):
+    """리포트 끝에 붙는 오류 요약 섹션. 오류가 없어도 섹션은 둔다."""
+    lines = ["## 오류 요약(errors)", ""]
+    if not errors:
+        lines.append("- 없음")
+    for e in errors:
+        lines.append(f"- `{e['step']}` · `{e['type']}` — {e['message']}")
+    return "\n".join(lines)
+
+
+NO_PLACES = "데이터 없음 (장소 검색 결과 0건)"
+
+
+def _places_lines(places):
+    if not places:
+        return [f"- {NO_PLACES}"]
+    lines = []
+    for p in places:
+        title = f"[{p['name']}]({p['url']})" if p.get("url") else p["name"]
+        category = f" · {p['category']}" if p.get("category") else ""
+        lines.append(f"- {title} — {p['address']}{category}")
+    return lines
+
+
+def fallback_report(date, recommendation, places_by_city, search_links=None):
+    """LLM 리포트 생성이 실패했을 때 데이터만으로 만드는 리포트 (과제 필수 항목은 모두 포함)."""
+    cities = recommendation["recommended_cities"]
+    lines = [f"# {date} 국내 여행 추천 리포트", "",
+             "> LLM 리포트 생성에 실패해 수집 데이터로만 구성한 리포트입니다.", "",
+             "## 추천 지역", ""]
+    lines += [f"- {c['recommended_city']}" + (" (대표 추천)" if i == 0 else "") for i, c in enumerate(cities)]
+    lines.append("")
+    for i, city in enumerate(cities, start=1):
+        name = city["recommended_city"]
+        places = places_by_city.get(name, [])
+        lines += [f"## {i}. {name}", "",
+                  "### 추천 이유", "", city["reason"], "",
+                  "### 날씨 요약", "", city["weather"], "",
+                  "### 행사/축제", ""]
+        lines += [f"- {e}" for e in city["events"]] or ["- 데이터 없음"]
+        lines += ["", "### 맛집 추천", ""]
+        lines += _places_lines(places)
+        if not places and (search_links or {}).get(name):
+            lines.append(f"- 직접 찾기: [지도에서 '{name} 맛집' 검색]({search_links[name]})")
+        event = city["events"][0] if city["events"] else "지역 명소"
+        lunch = f"{places[0]['name']}에서 점심" if places else "현지 식당에서 점심(맛집 데이터 없음)"
+        dinner = f"{places[1]['name']}에서 저녁" if len(places) > 1 else "숙소 근처에서 저녁"
+        lines += ["", "### 1일 일정 제안", "",
+                  f"- 오전: {name} 대표 명소 산책, {lunch}",
+                  f"- 오후: {event} 방문",
+                  f"- 저녁: {dinner}", ""]
+    return "\n".join(lines)
