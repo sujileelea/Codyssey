@@ -2,6 +2,7 @@
 
 실행: python build_dashboard.py   → dashboard/index.html 을 브라우저로 열면 된다(서버·인터넷 불필요).
 화면 상태(묶음·보기·집계·이동평균·기간·숨긴 계열)는 주소의 ? 뒤에 저장돼 그대로 공유·재현된다.
+'인사이트로 보기' 버튼(주소 ?insight=1~5)은 그 인사이트가 드러나는 화면으로 바꾸고 설명 상자·강조 구간을 띄운다.
 """
 
 import json
@@ -33,6 +34,64 @@ GROUPS = [
     {"id": "wiki", "label": "교차 확인: 영어 위키백과 조회수", "file": None,
      "note": "Google 과 독립된 측정. 단위는 주간 조회수(회)라 다른 묶음과 높이를 비교하지 않는다.",
      "series": [("wiki:Agentic_commerce", "Agentic commerce 문서"), ("wiki:Online_shopping", "Online shopping 문서")]},
+    {"id": "cross", "label": "교차 확인: Google vs 위키백과", "file": None,
+     "note": "Google 검색 관심도와 위키백과 조회수는 단위가 달라 '지수' 보기로 모양만 비교한다.",
+     "series": [("us:AI shopping", "Google 'AI shopping'"), ("hv:ChatGPT", "Google 'ChatGPT'(대형 검색어)"),
+                ("wiki:Agentic_commerce", "위키백과 'Agentic commerce' 조회수")]},
+]
+
+# 인사이트 보기 — 버튼을 누르면 그 인사이트가 드러나는 화면으로 바뀌고 설명 상자·강조 구간이 뜬다(REPORT 7절과 같은 순서).
+OTHERS = ["AI shopping assistant", "ChatGPT shopping", "agentic commerce", "Amazon Rufus"]
+INSIGHTS = [
+    {"short": "폭발과 둔화", "title": "2025년에 폭발, 2026년엔 둔화",
+     "body": "2024년까지는 관심이 거의 없다가 2025년에 약 9배로 뛰었다. 2026년 상반기에도 늘긴 했지만 "
+             "속도가 2025년의 약 1/6로 크게 느려졌다.",
+     "facts": ["연평균: 2024년 3.3 → 2025년 29.2 → 2026년 1~7월 초 76.6",
+               "분기 평균의 전분기 대비: 2025 Q3 +203% → Q4 +29% → 2026 Q1 +35% → Q2 +8%",
+               "증가 속도(13주 이동평균): 2025년 주 +6.0%(약 12주마다 2배) → 2026년 상반기 주 +0.9%(약 78주마다 2배)"],
+     "refs": "REPORT 인사이트 1 · 그림 1 · 2",
+     "state": {"g": "us", "view": "raw", "agg": "Q", "ma": 1, "from": "2023-01-01", "to": "2026-10-18",
+               "ev": False, "br": True, "hide": OTHERS},
+     "highlights": [["2025-01-01", "2025-10-01", "2025년: 분기마다 급증"], ["2026-01-01", "2026-04-01", "2026: 증가폭 축소"]]},
+    {"short": "발표·블프 때 급등", "title": "AI 쇼핑 기능 발표와 블랙프라이데이 때 튄다",
+     "body": "ChatGPT·구글이 AI 쇼핑 기능을 발표하면 한 달 동안 관심이 최대 80% 올랐고, 블랙프라이데이 때도 "
+             "평소의 1.2~1.5배로 튀었다. 일반 온라인 쇼핑과 같은 패턴이다.",
+     "facts": ["⑦ ChatGPT agent(2025-07-17) 뒤 4주 평균 27.2 → 49.5(+82%)",
+               "⑩ ChatGPT 쇼핑 리서치(11-24)·블랙프라이데이(11-28) 직후 84 — 그해 최고",
+               "블랙프라이데이 주 = 직전 4주 평균의 1.20배(2023) · 1.52배(2024) · 1.45배(2025), 'online shopping'과 비슷"],
+     "refs": "REPORT 인사이트 2 · 그림 3",
+     "state": {"g": "us", "view": "raw", "agg": "W", "ma": 1, "from": "2025-03-02", "to": "2025-12-28",
+               "ev": True, "br": False, "hide": OTHERS},
+     "highlights": [["2025-07-13", "2025-08-03", "ChatGPT agent 직후"], ["2025-11-23", "2025-12-07", "블랙프라이데이"]]},
+    {"short": "관심 주제 변화", "title": "관심 주제가 '쇼핑 도우미'에서 '대신 사 주는 AI'로",
+     "body": "아마존 Rufus 같은 쇼핑 도우미보다 'agentic commerce'(AI가 대신 사 주는 것) 검색이 더 빨리 커졌다. "
+             "2025년 9월부터는 agentic commerce가 Rufus를 앞선다.",
+     "facts": ["분기 비중: Amazon Rufus 2024 Q3 50.5% → 2026 Q3 4.1%",
+               "agentic commerce 비중: 2025 Q1 0.7% → 2026 Q3 16.4%",
+               "Rufus 자체는 줄지 않았다(연평균 2.8 → 5.8) — 다른 쪽이 더 빨리 큰 것"],
+     "refs": "REPORT 인사이트 3 · 그림 4",
+     "state": {"g": "us", "view": "raw", "agg": "M", "ma": 1, "from": "2024-01-01", "to": "2026-10-18",
+               "ev": False, "br": True, "hide": ["AI shopping", "AI shopping assistant"]},
+     "highlights": [["2025-09-01", "2026-07-01", "agentic commerce > Rufus"]]},
+    {"short": "7월 급락 검증", "title": "2026년 7월 급락은 진짜 관심 감소가 아닐 수 있다",
+     "body": "구글의 'AI shopping'은 −74% 떨어졌지만, 같은 기간 위키백과 조회수는 오히려 늘었고 큰 검색어 'ChatGPT'는 "
+             "그대로였다. 사람들이 관심을 잃었다기보다 구글의 측정 방식이 바뀌었을 가능성이 크다.",
+     "facts": ["급락 전 10주 → 후 14주 평균: 구글 'AI shopping' −74% · 한국 'AI 쇼핑' −80%",
+               "같은 기간 구글 'ChatGPT' +2% · 위키백과 'Agentic commerce' 문서 +25%",
+               "미국·한국이 같은 주(2026-07-12)에 함께 떨어짐 — 실제 관심 변화라면 이렇게 동시에 급변하기 어렵다"],
+     "refs": "REPORT 인사이트 4 · 그림 5 · 6",
+     "state": {"g": "cross", "view": "index", "agg": "W", "ma": 4, "from": "2026-03-01", "to": "2026-10-18",
+               "ev": False, "br": True, "hide": []},
+     "highlights": [["2026-07-19", "2026-10-18", "급락 후 14주"]]},
+    {"short": "한국 시차", "title": "한국은 미국보다 약 20주 늦게 따라왔다",
+     "body": "미국에서 먼저 관심이 오르고 한국은 약 5개월 뒤에 올랐다. 한국은 네이버의 AI 쇼핑 기능 출시(K1·K2) 때 함께 움직였다.",
+     "facts": ["4주 이동평균이 처음 25에 닿은 주: 미국 2025-06-22 → 한국 2025-11-09(20주 차이)",
+               "K2 네이버 쇼핑 AI 에이전트 베타(2026-02-26) 뒤 4주 평균 41.2 → 75.2(+82%)",
+               "한국 구글 검색은 양이 적어 261주 중 193주가 0 — 네이버 데이터로 다시 확인할 필요"],
+     "refs": "REPORT 인사이트 5 · 그림 7",
+     "state": {"g": "uskr", "view": "raw", "agg": "W", "ma": 4, "from": "2024-07-01", "to": "2026-10-18",
+               "ev": True, "br": True, "hide": []},
+     "highlights": [["2025-06-22", "2025-11-09", "약 20주 차이"]]},
 ]
 
 
@@ -40,7 +99,9 @@ def build_payload() -> dict:
     us, _ = load_trends("trends_us_weekly")
     dates = us.index
     frames = {g["file"]: load_trends(g["file"])[0] for g in GROUPS if g["file"]}
-    kr, _ = load_trends("trends_kr_weekly")
+    # "접두어:검색어" 키는 다른 요청의 계열을 가져온다(us·kr·lt·hv·wiki)
+    sources = {"us": us, "kr": load_trends("trends_kr_weekly")[0],
+               "lt": frames["trends_us_controls_longtail"], "hv": frames["trends_us_controls_highvol"]}
     wiki = {"Agentic_commerce": load_wiki_weekly("wiki_en_agentic_commerce")[0],
             "Online_shopping": load_wiki_weekly("wiki_en_online_shopping")[0]}
 
@@ -52,22 +113,22 @@ def build_payload() -> dict:
     for g in GROUPS:
         series = []
         for key, label in g["series"]:
-            if key.startswith("us:"):
-                s = us[key[3:]]
-            elif key.startswith("kr:"):
-                s = kr[key[3:]]
-            elif key.startswith("wiki:"):
-                s = wiki[key[5:]]
-            else:
+            prefix, _, name = key.partition(":")
+            if not name:
                 s = frames[g["file"]][key]
+            elif prefix == "wiki":
+                s = wiki[name]
+            else:
+                s = sources[prefix][name]
             series.append({"key": key, "label": label, "values": values(s)})
         groups.append({"id": g["id"], "label": g["label"], "note": g["note"], "series": series,
-                       "unit": "주간 조회수" if g["id"] == "wiki" else "검색 관심도"})
+                       "unit": {"wiki": "주간 조회수", "cross": "지수"}.get(g["id"], "검색 관심도")})
     return {
         "dates": [d.strftime("%Y-%m-%d") for d in dates],
         "groups": groups,
         "events": {"us": EVENTS_US, "kr": EVENTS_KR, "bf": BLACK_FRIDAY},
         "breakSpan": [PRE_LAST, POST[0]],
+        "insights": INSIGHTS,
         "source": f"Google Trends(주간, {dates.min():%Y-%m-%d}~{dates.max():%Y-%m-%d}) · Wikimedia Pageviews",
     }
 
@@ -84,7 +145,7 @@ TEMPLATE = r"""<!doctype html>
   --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
   --grid: #e1e0d9; --axis: #c3c2b7; --wash: #f0efec; --border: rgba(11,11,11,0.10);
   --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
-  --focus: #2a78d6;
+  --focus: #2a78d6; --hl: rgba(42,120,214,0.10);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -92,6 +153,7 @@ TEMPLATE = r"""<!doctype html>
     --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
     --grid: #2c2c2a; --axis: #383835; --wash: #262624; --border: rgba(255,255,255,0.10);
     --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --focus: #3987e5;
+    --hl: rgba(57,135,229,0.20);
   }
 }
 :root[data-theme="dark"] {
@@ -99,6 +161,7 @@ TEMPLATE = r"""<!doctype html>
   --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
   --grid: #2c2c2a; --axis: #383835; --wash: #262624; --border: rgba(255,255,255,0.10);
   --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --focus: #3987e5;
+  --hl: rgba(57,135,229,0.20);
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--page); color: var(--ink);
@@ -144,6 +207,18 @@ details { margin-top: 12px; }
 details summary { cursor: pointer; color: var(--ink-2); }
 .table-scroll { max-height: 360px; overflow: auto; margin-top: 8px; }
 footer { color: var(--muted); font-size: 12px; margin-top: 16px; }
+.insights { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; padding-bottom: 14px;
+  border-bottom: 1px solid var(--grid); }
+.insights > span { font-size: 12px; color: var(--ink-2); margin-right: 4px; }
+.insights button { font-size: 13px; padding: 4px 10px; min-height: 30px; }
+.insights button[aria-pressed="true"] { border-color: var(--ink); background: var(--wash); font-weight: 600; }
+.insight { background: var(--wash); border-radius: 10px; padding: 12px 14px; margin: 4px 0 12px; }
+.insight[hidden] { display: none; }
+.insight .kicker { font-size: 12px; color: var(--muted); }
+.insight h2 { font-size: 17px; margin: 2px 0 6px; }
+.insight p { margin: 0 0 6px; }
+.insight ul { margin: 0 0 6px; padding-left: 18px; color: var(--ink-2); font-size: 13px; }
+.insight .ref { font-size: 12px; color: var(--muted); margin: 0; }
 </style>
 </head>
 <body>
@@ -151,6 +226,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 16px; }
   <h1>AI 쇼핑 관심도 대시보드</h1>
   <p class="lead">Google Trends 검색 관심도로 본 'AI 쇼핑' 관심의 흐름. 묶음·기간·보기·집계 단위를 바꿔 가며 탐색한다.</p>
   <section class="card">
+    <div class="insights" id="insightButtons" role="group" aria-label="인사이트로 보기"></div>
     <div class="filters" role="group" aria-label="필터">
       <label class="field"><span>묶음</span><select id="group"></select></label>
       <label class="field"><span>보기</span>
@@ -179,6 +255,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 16px; }
       <label><input type="checkbox" id="ev"> 사건 표시</label>
       <label><input type="checkbox" id="br"> 단절 의심 구간(2026-07-12 주) 표시</label>
     </div>
+    <div class="insight" id="insightPanel" hidden aria-live="polite"></div>
     <p class="note" id="groupNote"></p>
     <div class="chart-wrap" id="chartWrap">
       <svg id="chart" role="img" aria-labelledby="chartTitle" tabindex="0"><title id="chartTitle">AI 쇼핑 관심도 추이</title></svg>
@@ -199,11 +276,19 @@ const CIRCLED = "①②③④⑤⑥⑦⑧⑨⑩";
 const $ = (id) => document.getElementById(id);
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const state = { g: "us", view: "raw", agg: "W", ma: 4, from: DATA.dates[0], to: DATA.dates[DATA.dates.length - 1],
-  ev: true, br: true, hide: new Set() };
+  ev: true, br: true, hide: new Set(), insight: 0 };
+
+function applyInsight(n) {
+  const s = DATA.insights[n - 1].state;
+  Object.assign(state, { g: s.g, view: s.view, agg: s.agg, ma: s.ma, from: s.from, to: s.to, ev: s.ev, br: s.br,
+    hide: new Set(s.hide), insight: n });
+}
 
 function readURL() {
   try {
     const p = new URLSearchParams(location.search);
+    const ins = +p.get("insight");
+    if (ins >= 1 && ins <= DATA.insights.length) { applyInsight(ins); return; }
     if (p.get("g") && DATA.groups.some((g) => g.id === p.get("g"))) state.g = p.get("g");
     if (["raw", "index", "pop", "yoy"].includes(p.get("view"))) state.view = p.get("view");
     if (["W", "M", "Q"].includes(p.get("agg"))) state.agg = p.get("agg");
@@ -217,6 +302,7 @@ function readURL() {
 }
 function writeURL() {
   try {
+    if (state.insight) { history.replaceState(null, "", "?insight=" + state.insight); return; }
     const p = new URLSearchParams({ g: state.g, view: state.view, agg: state.agg, ma: state.ma,
       from: state.from, to: state.to, ev: state.ev ? 1 : 0, br: state.br ? 1 : 0 });
     if (state.hide.size) p.set("hide", [...state.hide].join("|"));
@@ -334,6 +420,7 @@ function render() {
   const vals = visible.flatMap((s) => s.values.filter((v) => v !== null));
   let lo = vals.length ? Math.min(...vals) : 0, hi = vals.length ? Math.max(...vals) : 1;
   if (state.view === "raw" || state.view === "index") lo = Math.min(0, lo);
+  if (state.insight) hi += (hi - lo) * 0.1;   // 강조 구간 라벨이 선과 겹치지 않게 위쪽 여백
   const yt = niceTicks(lo, hi);
   const y0 = yt[0], y1 = yt[yt.length - 1];
   const x = (t) => m.l + ((t - t0) / Math.max(1, t1 - t0)) * (W - m.l - m.r);
@@ -343,6 +430,16 @@ function render() {
   if (state.br) {
     const a = Math.max(t0, toT(DATA.breakSpan[0])), b = Math.min(t1, toT(DATA.breakSpan[1]));
     if (b > a) g += `<rect x="${x(a)}" y="${m.t}" width="${Math.max(2, x(b) - x(a))}" height="${H - m.t - m.b}" fill="var(--wash)"/>`;
+  }
+  // 인사이트 강조 구간
+  if (state.insight) {
+    DATA.insights[state.insight - 1].highlights.forEach(([a0, b0, label]) => {
+      const a = Math.max(t0, toT(a0)), b = Math.min(t1, toT(b0));
+      if (b < a) return;
+      const w = Math.max(6, x(b) - x(a));
+      g += `<rect x="${x(a)}" y="${m.t}" width="${w}" height="${H - m.t - m.b}" fill="var(--hl)"/>`;
+      g += `<text x="${x(a) + 6}" y="${m.t + 16}" style="font-size:12px;fill:var(--ink);paint-order:stroke;stroke:var(--surface);stroke-width:3px">${label}</text>`;
+    });
   }
   // 격자·눈금
   yt.forEach((v) => {
@@ -392,7 +489,18 @@ function render() {
   $("eventKey").textContent = shown.length ? "사건: " + shown.map(([d, mk, name]) => `${mk} ${d} ${name}`).join(" · ") : "";
   renderSummary(visible);
   renderTable(visible);
+  renderInsight();
   bindHover();
+}
+
+function renderInsight() {
+  const panel = $("insightPanel");
+  document.querySelectorAll("[data-insight]").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.insight === state.insight)));
+  if (!state.insight) { panel.hidden = true; return; }
+  const it = DATA.insights[state.insight - 1];
+  panel.innerHTML = `<div class="kicker">인사이트 ${state.insight} / ${DATA.insights.length}</div><h2>${it.title}</h2>
+    <p>${it.body}</p><ul>${it.facts.map((f) => `<li>${f}</li>`).join("")}</ul><p class="ref">근거: ${it.refs}</p>`;
+  panel.hidden = false;
 }
 
 function renderSummary(visible) {
@@ -454,6 +562,8 @@ function bindHover() {
 }
 
 function setupControls() {
+  $("insightButtons").innerHTML = `<span>인사이트로 보기</span>` + DATA.insights.map((it, i) =>
+    `<button type="button" data-insight="${i + 1}" aria-pressed="false">${i + 1} ${it.short}</button>`).join("");
   $("group").innerHTML = DATA.groups.map((g) => `<option value="${g.id}">${g.label}</option>`).join("");
   const sync = () => {
     $("group").value = state.g; $("view").value = state.view; $("agg").value = state.agg; $("ma").value = String(state.ma);
@@ -463,23 +573,29 @@ function setupControls() {
     $("seriesToggles").innerHTML = group.series.map((s, i) =>
       `<label><input type="checkbox" data-key="${s.key}" ${state.hide.has(s.key) ? "" : "checked"}><i class="swatch" style="background:var(${COLORS[i]})"></i>${s.label}</label>`).join("");
     $("seriesToggles").querySelectorAll("input").forEach((el) => el.addEventListener("change", () => {
-      el.checked ? state.hide.delete(el.dataset.key) : state.hide.add(el.dataset.key); update();
+      el.checked ? state.hide.delete(el.dataset.key) : state.hide.add(el.dataset.key); changed();
     }));
   };
   const update = () => { writeURL(); render(); };
-  $("group").addEventListener("change", (e) => { state.g = e.target.value; state.hide.clear(); sync(); update(); });
-  $("view").addEventListener("change", (e) => { state.view = e.target.value; update(); });
-  $("agg").addEventListener("change", (e) => { state.agg = e.target.value; update(); });
-  $("ma").addEventListener("change", (e) => { state.ma = +e.target.value; update(); });
-  $("from").addEventListener("change", (e) => { if (e.target.value) { state.from = e.target.value; update(); } });
-  $("to").addEventListener("change", (e) => { if (e.target.value) { state.to = e.target.value; update(); } });
-  $("ev").addEventListener("change", (e) => { state.ev = e.target.checked; update(); });
-  $("br").addEventListener("change", (e) => { state.br = e.target.checked; update(); });
+  // 직접 조작하면 인사이트 화면에서 벗어난다(설명 상자·강조 구간 해제)
+  const changed = () => { state.insight = 0; update(); };
+  document.querySelectorAll("[data-insight]").forEach((b) => b.addEventListener("click", () => {
+    applyInsight(+b.dataset.insight); sync(); update();
+  }));
+  $("group").addEventListener("change", (e) => { state.g = e.target.value; state.hide.clear(); state.insight = 0; sync(); update(); });
+  $("view").addEventListener("change", (e) => { state.view = e.target.value; changed(); });
+  $("agg").addEventListener("change", (e) => { state.agg = e.target.value; changed(); });
+  $("ma").addEventListener("change", (e) => { state.ma = +e.target.value; changed(); });
+  $("from").addEventListener("change", (e) => { if (e.target.value) { state.from = e.target.value; changed(); } });
+  $("to").addEventListener("change", (e) => { if (e.target.value) { state.to = e.target.value; changed(); } });
+  $("ev").addEventListener("change", (e) => { state.ev = e.target.checked; changed(); });
+  $("br").addEventListener("change", (e) => { state.br = e.target.checked; changed(); });
   document.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("click", () => {
     const last = DATA.dates[DATA.dates.length - 1];
     const p = b.dataset.preset;
     state.to = last;
     state.from = p === "all" ? DATA.dates[0] : p === "2025" ? "2025-01-01" : p === "52" ? DATA.dates[DATA.dates.length - 52] : "2026-03-01";
+    state.insight = 0;
     sync(); update();
   }));
   $("chart").addEventListener("keydown", (e) => {
