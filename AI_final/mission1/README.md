@@ -19,6 +19,7 @@ mission1/
 ├── collect.py                데이터 수집(Google Trends · Wikimedia Pageviews)
 ├── analysis.py               정제 · 분석 · 그림 9장 · 표
 ├── build_dashboard.py        대시보드 HTML 생성
+├── clean.py                  생성 산출물 정리(평가 전 초기화)
 ├── data/
 │   ├── raw/                  수집 원본 CSV 7개(분석 기준 데이터)
 │   ├── metadata.json         파일별 출처 · 검색어 · 기간 · 수집 시각
@@ -46,6 +47,18 @@ open dashboard/index.html   # 브라우저로 열기(Windows 는 start, Linux �
 ```
 
 - `data/raw/` 에 수집 원본이 들어 있어 `collect.py` 없이 바로 재현된다.
+
+### 평가 전 초기화 — 처음부터 다시 만들어 보기
+
+```bash
+python clean.py --dry-run   # 지울 목록만 보기
+python clean.py             # 생성 산출물 삭제: images/ · outputs/ · data/processed/ · dashboard/index.html · __pycache__/
+python analysis.py && python build_dashboard.py   # 다시 생성
+git status --short .        # 변경 없음 = 커밋된 결과와 바이트 단위로 같게 재현됨
+```
+
+- 지우지 않는 것: 수집 원본(`data/raw/` · `data/metadata.json`) · 대시보드 캡처(`dashboard/screenshots/`) · 코드 · 문서
+- 되돌리기: 위 '다시 생성' 명령, 또는 `git restore .`
 - 데이터를 새로 받으려면 `python collect.py --force` — Google Trends 요청 사이에 20초씩 쉬어 2~5분 걸린다. 새로 받은 값은 표본이 달라 리포트 수치와 조금 다를 수 있다.
 
 ## 데이터 출처 · 수집 방법 · 라이선스
