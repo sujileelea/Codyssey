@@ -210,7 +210,7 @@ def build_features(us: pd.DataFrame) -> pd.DataFrame:
     trailing4 = s.rolling(4).mean()
     f["yoy_ratio_4w"] = np.where(trailing4.shift(52) >= 1, trailing4 / trailing4.shift(52), np.nan)
     # 변동성: 주간 로그 변화율의 13주 표준편차(수준과 무관하게 '주마다 얼마나 출렁이나'). 값 5 미만 구간은 제외.
-    logchg = np.log(s / prev).where((s >= 5) & (prev >= 5))
+    logchg = np.log((s / prev).where((s >= 5) & (prev >= 5)))   # 조건을 먼저 걸어 log(0) 경고를 막는다
     f["vol13"] = logchg.rolling(13, min_periods=8).std() * 100
     # 급등 탐지: 직전 8주 중앙값 대비 로그 비율을 로버스트 z 점수로 바꾼다(2023년 이후만).
     base = s.shift(1).rolling(8).median()
