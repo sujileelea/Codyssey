@@ -156,7 +156,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 16px; }
       <label class="field"><span>보기</span>
         <select id="view">
           <option value="raw">원값</option>
-          <option value="index">지수(기간 첫 값 = 100)</option>
+          <option value="index">지수(기간 첫 4개 평균 = 100)</option>
           <option value="pop">직전 대비 변화율(%)</option>
           <option value="yoy">전년 같은 시기 대비(%)</option>
         </select></label>
@@ -274,8 +274,10 @@ function prepare() {
     let dates = a.dates.filter((_, i) => keep[i]);
     v = v.filter((_, i) => keep[i]);
     if (state.view === "index") {
-      const base = v.find((x) => x !== null && x >= 1);
-      if (base === undefined) { v = v.map(() => null); warn = "기간 첫 값이 1 미만인 계열은 지수를 계산하지 않았다."; }
+      // 한 점의 출렁임에 기준이 흔들리지 않게 기간 첫 4개 값의 평균을 100 으로 둔다
+      const head = v.filter((x) => x !== null).slice(0, 4);
+      const base = head.length ? head.reduce((p, q) => p + q, 0) / head.length : 0;
+      if (base < 1) { v = v.map(() => null); warn = "기간 첫 4개 값의 평균이 1 미만인 계열은 지수를 계산하지 않았다."; }
       else v = v.map((x) => (x === null ? null : (x / base) * 100));
     }
     out.push({ key: s.key, label: s.label, color: COLORS[idx], dates, values: v, hidden: state.hide.has(s.key) });

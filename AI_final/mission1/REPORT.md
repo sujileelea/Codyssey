@@ -405,7 +405,7 @@
 | 1 | 기본: 미국 5종 · 원값 · 주 · 이동평균 4 · 전체 기간 · 사건 표시, 2026-06-07 주에 툴팁 | ![](dashboard/screenshots/01_default.png) | 2025년 급증과 2026-07 급락, 최고점 주의 검색어별 값 |
 | 2 | 보기를 '직전 대비 변화율'로, 기간을 '2025~'로, 'AI shopping'만 켬, 2025-07-13 주 툴팁 | ![](dashboard/screenshots/02_spikes_pop.png) | ⑦ ChatGPT agent 직후 +63%, ⑧ 직후 +80% 같은 급등 주 |
 | 3 | 묶음을 '미국 vs 한국'으로, 기간 2024-07~ | ![](dashboard/screenshots/03_us_vs_kr.png) | 한국이 미국을 약 20주 늦게 따라온 모양, K1·K2 시점 |
-| 4 | 묶음을 '대조: 쇼핑 소량 검색어'로, 보기를 '지수(기간 첫 값 = 100)'로, '급락 전후' 기간 | ![](dashboard/screenshots/04_break_index.png) | 2026-07 이후 'AI shopping'·'price comparison'은 급락, 'online shopping'은 소폭 하락 |
+| 4 | 묶음을 '대조: 쇼핑 소량 검색어'로, 보기를 '지수(기간 첫 4개 평균 = 100)'로, '급락 전후' 기간 | ![](dashboard/screenshots/04_break_index.png) | 2026-07 이후 'AI shopping'·'price comparison'은 급락, 'online shopping'은 소폭 하락 |
 | 5 | 미국 5종에서 'AI shopping'·'Amazon Rufus'만 켜고, 집계를 '분기 평균', 보기를 '전년 같은 시기 대비'로 | ![](dashboard/screenshots/05_quarterly_yoy.png) | 2025 Q3 전년 대비 +1,305% 정점, 2026 Q3 −30.5% |
 | 6 | 묶음을 '위키백과 조회수'로, 기간 2025-12~ | ![](dashboard/screenshots/06_wiki_crosscheck.png) | 7월 단절 구간에 위키백과는 떨어지지 않음, 9월 말 Agentic commerce 최고치 |
 | 7 | 휴대폰 폭(390px)에서 월 평균 보기 | ![](dashboard/screenshots/07_mobile.png) | 필터가 줄바꿈되고 그래프·표가 화면 폭에 맞춰짐 |
