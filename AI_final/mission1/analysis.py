@@ -140,6 +140,12 @@ def end_label(ax, x, y, text, dy=0):
                 color=INK["secondary"], va="center")
 
 
+def rolling_by_segment(x, window, **kw):
+    """이동평균이 구조 단절(2026-07-12 주)을 넘지 않게 앞뒤 구간을 따로 계산한다.
+    가운데 정렬 창이 단절을 넘으면 단절 전 몇 주에 단절 후의 낮은 값이 섞여 추세가 왜곡된다."""
+    return pd.concat([part.rolling(window, **kw).mean() for part in (x[:PRE_LAST], x[BREAK_WEEK:])])
+
+
 def event_key(events, per_line=5):
     items = [f"{CIRCLED[i]} {name}" for i, (_, name) in enumerate(events)]
     return "\n".join("  ".join(items[i:i + per_line]) for i in range(0, len(items), per_line))
@@ -196,8 +202,8 @@ def load_all():
 def build_features(us: pd.DataFrame) -> pd.DataFrame:
     s = us[MAIN]
     f = pd.DataFrame({MAIN: s})
-    f["ma4"] = s.rolling(4, center=True, min_periods=3).mean()     # 한 달 흐름(가운데 정렬)
-    f["ma13"] = s.rolling(13, center=True, min_periods=7).mean()   # 한 분기 흐름(가운데 정렬)
+    f["ma4"] = rolling_by_segment(s, 4, center=True, min_periods=3)     # 한 달 흐름(가운데 정렬)
+    f["ma13"] = rolling_by_segment(s, 13, center=True, min_periods=7)   # 한 분기 흐름(가운데 정렬)
     prev = s.shift(1)
     # 0 은 '검색량이 임계값 미만' 이라 변화율의 분모로 쓰지 않는다(분모 5 이상만 계산).
     f["wow_pct"] = np.where(prev >= 5, (s / prev - 1) * 100, np.nan)
@@ -260,7 +266,7 @@ def black_friday_table(series: dict) -> pd.DataFrame:
 
 
 def takeoff(s: pd.Series, level: float):
-    ma = s.rolling(4, center=True, min_periods=3).mean()   # 그림 07 과 같은 이동평균
+    ma = rolling_by_segment(s, 4, center=True, min_periods=3)   # 그림 07 과 같은 이동평균
     hit = ma[ma >= level]
     return hit.index[0] if len(hit) else None
 
@@ -344,7 +350,7 @@ def fig01_trend(f, numbers):
                  bbox=dict(boxstyle="round,pad=0.25", fc=INK["surface"], ec="none"))
     date_axis(ax2)
     finish(fig, ax1, "미국 'AI shopping' 검색 관심도: 2025년부터 가파르게 오르고 2026년 7월에 꺾였다",
-           "위: 실제 값(주간)과 이동평균 · 아래: 같은 13주 이동평균을 로그 눈금으로(같은 기울기 = 같은 증가 속도)\n" + event_key(EVENTS_US),
+           "위: 실제 값(주간)과 이동평균(단절 앞뒤를 따로 계산) · 아래: 같은 13주 이동평균을 로그 눈금으로(같은 기울기 = 같은 증가 속도)\n" + event_key(EVENTS_US),
            "출처: Google Trends — 미국, 주간, 2021-10-24~2026-10-18(진행 중인 마지막 주 제외) · 이동평균은 가운데 정렬",
            "01_trend_moving_average.png")
 
@@ -414,7 +420,7 @@ def fig03_spikes(f, us):
 
 def fig04_keywords(us):
     cols = list(us.columns)
-    ma = us.rolling(4, center=True, min_periods=3).mean()["2023-01-01":]
+    ma = rolling_by_segment(us, 4, center=True, min_periods=3)["2023-01-01":]
     fig, (ax1, ax2) = new_fig(2, 1, height=7.4, gridspec_kw={"height_ratios": [3, 2]})
     for i, c in enumerate(cols):
         ax1.plot(ma.index, ma[c], color=SERIES[i], lw=2.2 if c == MAIN else 1.6, label=c)
@@ -539,8 +545,8 @@ def fig06_daily(daily, numbers):
 
 
 def fig07_us_kr(us, kr, numbers):
-    a = us[MAIN].rolling(4, center=True, min_periods=3).mean()["2024-01-01":]
-    b = kr[KR].rolling(4, center=True, min_periods=3).mean()["2024-01-01":]
+    a = rolling_by_segment(us[MAIN], 4, center=True, min_periods=3)["2024-01-01":]
+    b = rolling_by_segment(kr[KR], 4, center=True, min_periods=3)["2024-01-01":]
     fig, ax = new_fig(1, 1, height=5.4)
     ax.plot(a.index, a, color=SERIES[0], lw=2.2, label="미국 'AI shopping'")
     ax.plot(b.index, b, color=SERIES[1], lw=2.2, label="한국 'AI 쇼핑'")
