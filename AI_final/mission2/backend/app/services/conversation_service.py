@@ -1,4 +1,5 @@
 """대화 기록 규칙 — 제목 · 미리보기 · 메시지 수를 문서에 함께 저장해 목록을 messages 없이 그린다."""
+import re
 from datetime import datetime, timezone
 
 from ..errors import AppError
@@ -9,7 +10,7 @@ PREVIEW_LEN = 60
 
 
 def _clip(text: str, n: int) -> str:
-    text = " ".join(text.split())
+    text = " ".join(re.sub(r"\*\*|__|`|^#+\s*", "", text, flags=re.M).split())   # 미리보기에 마크다운 기호를 남기지 않는다
     return text if len(text) <= n else text[: n - 1] + "…"
 
 

@@ -9,7 +9,8 @@ from statistics import mean, median, pstdev
 TREND_WINDOW = 4          # 최근 N개 평균 vs 직전 N개 평균(단기)
 LONG_WINDOW = 13          # 장기(주간이면 한 분기)
 TREND_THRESHOLD = 5.0     # ±5% 안이면 '유지'
-SMALL_BASE_RATIO = 0.05   # 변화율 분모가 최댓값의 5% 미만이면 계산하지 않음(0 → 1 이 +∞% 가 되는 것 방지)
+SMALL_BASE_RATIO = 0.10   # 직전 값 대비 변화율: 분모가 최댓값의 10% 미만이면 계산하지 않음(6 → 2 = -67% 같은 작은 값 착시 방지)
+YEAR_BASE_RATIO = 0.05    # 연평균 대비 변화율: 연평균 최댓값의 5% 미만이면 계산하지 않음
 
 
 def _r(x: float | None, n: int = 2) -> float | None:
@@ -125,7 +126,7 @@ def statistics(points: list[dict], ma_window: int = 4) -> dict:
     for p in points:
         years.setdefault(p["date"][:4], []).append(p["value"])
     year_avgs = {y: mean(v) for y, v in years.items()}
-    year_base = max(abs(a) for a in year_avgs.values()) * SMALL_BASE_RATIO
+    year_base = max(abs(a) for a in year_avgs.values()) * YEAR_BASE_RATIO
     yearly, prev = [], None
     for y, v in sorted(years.items()):
         avg = year_avgs[y]

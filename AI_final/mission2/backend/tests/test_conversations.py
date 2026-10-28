@@ -36,3 +36,9 @@ def test_validation(client):
         assert client.post("/api/conversations", json=body).status_code == 422, body
     assert client.delete("/api/conversations/없는-id").status_code == 422     # ID 형식
     assert client.delete("/api/conversations/missing").status_code == 404
+
+
+def test_preview_strips_markdown(client):
+    conv = client.post("/api/conversations", json={"messages": [
+        {"role": "user", "content": "q"}, {"role": "assistant", "content": "**2026년 10월**은 `19.67` 입니다"}]}).json()
+    assert conv["preview"] == "2026년 10월은 19.67 입니다"
