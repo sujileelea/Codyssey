@@ -59,7 +59,8 @@ def get_settings() -> Settings:
         openai_model=_text("OPENAI_MODEL", "gpt-5.4-mini"),
         openai_base_url=_text("OPENAI_BASE_URL"),
         openai_max_tokens=_int("OPENAI_MAX_TOKENS", 1000),
-        openai_reasoning_effort=_text("OPENAI_REASONING_EFFORT", "low"),
+        # gpt-5.4-mini 는 Chat Completions 에서 도구(Function Calling)를 쓰려면 none 이어야 한다
+        openai_reasoning_effort=_text("OPENAI_REASONING_EFFORT", "none"),
         openai_timeout=float(_text("OPENAI_TIMEOUT", "40")),
         firebase_service_account_json=_text("FIREBASE_SERVICE_ACCOUNT_JSON"),
         firebase_service_account_path=_text("FIREBASE_SERVICE_ACCOUNT_PATH"),
