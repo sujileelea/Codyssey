@@ -5,7 +5,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, Path, Query
 
 from ..deps import get_data_service
-from ..schemas import ID_PATTERN, DataIn, DataList, DataOut, Deleted
+from ..schemas import ID_PATTERN, DataIn, DataList, DataOut, Deleted, Statistics, Summary
 from ..services.data_service import DataService
 
 router = APIRouter(prefix="/api/data", tags=["data"])
@@ -27,6 +27,20 @@ def list_data(
     svc: DataService = Depends(get_data_service),
 ):
     return svc.list(start, end, order, limit)
+
+
+@router.get("/summary", response_model=Summary, summary="데이터 요약(프롬프트 주입용)",
+            description="기간 · 개수 · 기본 통계(합계 · 평균 · 중앙값 · 표준편차 · 최대 · 최소) · 최근 추세"
+                        "(최근 4개 평균 vs 직전 4개 평균, ±5% 안 = 유지) + 최근 값 · 월평균 · 메모가 있는 시점.")
+def data_summary(svc: DataService = Depends(get_data_service)):
+    return svc.summary()
+
+
+@router.get("/statistics", response_model=Statistics, response_model_by_alias=True, summary="추가 통계(보너스)",
+            description="이동평균 · 연도별 평균과 전년 대비 · 전년 같은 시기 대비 · 최대 상승/하락 · 변동성 · 연속 방향 · 최고점 대비.")
+def data_statistics(ma_window: int = Query(4, ge=2, le=52, description="이동평균 창 크기"),
+                    svc: DataService = Depends(get_data_service)):
+    return svc.statistics(ma_window)
 
 
 @router.put("/{item_id}", response_model=DataOut, summary="데이터 수정(date · value · memo 전체)",

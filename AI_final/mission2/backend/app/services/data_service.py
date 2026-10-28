@@ -10,6 +10,7 @@ from datetime import date
 
 from ..errors import AppError
 from ..schemas import DataIn
+from . import analysis
 
 CACHE_SECONDS = 60
 
@@ -40,6 +41,12 @@ class DataService:
             rows.reverse()
         rows = rows[:limit]
         return {"count": len(rows), "total": len(points), "items": rows}
+
+    def summary(self) -> dict:
+        return analysis.summarize(self.all_points())
+
+    def statistics(self, ma_window: int = 4) -> dict:
+        return analysis.statistics(self.all_points(), ma_window)
 
     # ── 쓰기 ──
     def create(self, body: DataIn) -> dict:
