@@ -66,4 +66,6 @@ def health():
         "firestore_configured": firebase.is_configured(),
         "openai_configured": bool(settings.openai_api_key),
         "model": settings.openai_model,
+        "dataset_name": settings.dataset_name,
+        "dataset_unit": settings.dataset_unit,
     }
