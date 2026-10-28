@@ -56,6 +56,14 @@ function scrollDown() {
   box.scrollTop = box.scrollHeight;
 }
 
+// 주소에 열린 대화를 남겨 새로 고침 · 링크 공유 때 같은 대화를 다시 연다(?c=<대화 ID>)
+function syncUrl() {
+  const url = new URL(location.href);
+  if (current.id) url.searchParams.set("c", current.id);
+  else url.searchParams.delete("c");
+  history.replaceState(null, "", url);
+}
+
 function render() {
   const box = $("messages");
   box.replaceChildren();
@@ -63,6 +71,7 @@ function render() {
   for (const m of current.messages) box.append(messageNode(m));
   $("chat-heading").textContent = current.title;
   syncSaveUi();
+  syncUrl();
   scrollDown();
 }
 
@@ -112,6 +121,7 @@ async function send(text) {
       current.id = res.conversation_id;
       current.title = question.length > 30 ? question.slice(0, 29) + "…" : question;
       $("chat-heading").textContent = current.title;
+      syncUrl();
     }
     if (res.notice) toast(res.notice, true);
     if (res.saved) loadConversations();
@@ -191,6 +201,7 @@ async function saveConversation(title) {
     current.id = conv.id;
     current.title = conv.title;
     $("chat-heading").textContent = conv.title;
+    syncUrl();
     toast(`저장했습니다: ${conv.title} (메시지 ${conv.message_count}개)`);
     loadConversations();
   } catch (e) {
@@ -225,4 +236,4 @@ export function initChat() {
   render();
 }
 
-export { loadConversations };
+export { loadConversations, openConversation };
