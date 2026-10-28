@@ -5,3 +5,5 @@
 *firebase-adminsdk*.json
 service-account*.json
 backups/
+# Vercel CLI 연결 정보
+.vercel/
