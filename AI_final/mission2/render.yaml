@@ -1,0 +1,31 @@
+# Render Blueprint — 백엔드(FastAPI) 무료 웹 서비스 1개.
+# 대시보드 New → Blueprint → 저장소 sujileelea/Codyssey · 브랜치 develop · Blueprint 경로 AI_final/mission2/render.yaml
+# 비밀 값(sync: false)은 처음 만들 때 대시보드에서 직접 입력한다 — 저장소에는 이름만 있다.
+services:
+  - type: web
+    name: my-data-assistant-api
+    runtime: python
+    plan: free
+    region: singapore
+    branch: develop
+    rootDir: AI_final/mission2/backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-5.4-mini
+      - key: OPENAI_MAX_TOKENS
+        value: "1000"
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: CHAT_RATE_PER_MINUTE
+        value: "10"
+      - key: CHAT_DAILY_LIMIT
+        value: "300"
