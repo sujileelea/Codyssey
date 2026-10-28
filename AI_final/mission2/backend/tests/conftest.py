@@ -13,7 +13,11 @@ from fastapi.testclient import TestClient
 import main
 from app import deps
 from app.repositories import now
+from app.config import get_settings
+from app.services.chat_service import ChatService
 from app.services.conversation_service import ConversationService
+from app.services.llm import LLMResult
+from app.services.rate_limit import RateLimiter
 from app.services.data_service import DataService
 
 _ids = itertools.count(1)
@@ -73,6 +77,23 @@ class MemoryConversationRepository:
         self.docs.pop(conv_id, None)
 
 
+class FakeLLM:
+    """GPT 대신 — 받은 messages 를 기록하고 정해 둔 답(또는 오류)을 돌려준다."""
+    model = "fake-gpt"
+
+    def __init__(self):
+        self.calls = []
+        self.replies = []          # LLMResult 또는 Exception 을 차례로 꺼낸다
+
+    def complete(self, messages, tools=None):
+        self.calls.append({"messages": messages, "tools": tools})
+        nxt = self.replies.pop(0) if self.replies else LLMResult(content="가짜 답변", finish_reason="stop",
+                                                                 usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15})
+        if isinstance(nxt, Exception):
+            raise nxt
+        return nxt
+
+
 def weekly(values, start="2025-01-05", memo=None):
     """일요일부터 1주 간격의 행 목록."""
     from datetime import date, timedelta
@@ -92,11 +113,23 @@ def conv_repo():
 
 
 @pytest.fixture
-def client(data_repo, conv_repo):
+def llm():
+    return FakeLLM()
+
+
+@pytest.fixture
+def limiter():
+    return RateLimiter(per_minute=100, per_day=1000)
+
+
+@pytest.fixture
+def client(data_repo, conv_repo, llm, limiter):
     svc = DataService(data_repo, cache_seconds=0)
     conv = ConversationService(conv_repo)
+    chat = ChatService(svc, conv, lambda: llm, get_settings(), limiter)
     main.app.dependency_overrides[deps.get_data_service] = lambda: svc
     main.app.dependency_overrides[deps.get_conversation_service] = lambda: conv
+    main.app.dependency_overrides[deps.get_chat_service] = lambda: chat
     with TestClient(main.app) as c:
         yield c
     main.app.dependency_overrides.clear()

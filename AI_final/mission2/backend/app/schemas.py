@@ -215,3 +215,43 @@ class ConversationList(BaseModel):
 
 class ConversationDetail(ConversationItem):
     messages: list[Message]
+
+
+# ── 채팅 ──────────────────────────────────────────────────
+
+class ChatIn(_In):
+    model_config = ConfigDict(json_schema_extra={"examples": [{"message": "가장 관심이 높았던 때는 언제야?"}]})
+
+    message: str = Field(min_length=1, max_length=2000, description="사용자 질문")
+    conversation_id: str | None = Field(None, pattern=ID_PATTERN, description="이어 갈 저장된 대화(없으면 새 대화)")
+    history: list[Message] = Field(default_factory=list, max_length=20,
+                                   description="저장하지 않은 대화를 이어 갈 때 이전 메시지(conversation_id 가 있으면 무시)")
+    save: bool = Field(True, description="질문과 답을 conversations 에 자동 저장")
+
+
+class ChatContext(BaseModel):
+    """이번 답변에 주입된 요약의 핵심(화면 표시용)."""
+    period: str | None
+    count: int
+    trend: str
+
+
+class Usage(BaseModel):
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+
+
+class ChatOut(BaseModel):
+    conversation_id: str | None
+    saved: bool
+    reply: str
+    model: str
+    tool_calls: list[ToolCall] = []
+    context: ChatContext
+    usage: Usage | None = None
+
+
+class PromptPreview(BaseModel):
+    summary: Summary
+    system_prompt: str
