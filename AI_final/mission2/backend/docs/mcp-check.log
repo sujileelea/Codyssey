@@ -1,0 +1,21 @@
+# MCP 호출 검증 2026-10-28 19:42 · API_BASE_URL=https://codyssey-mydata-api.onrender.com
+
+[1] tools/list → 6개: get_data_summary, query_data, get_statistics, list_conversations, get_conversation, ask_assistant
+
+[2] tools/call get_data_summary {} → 성공
+    기간 2021-10-24 ~ 2026-10-18 · 261개 · 평균 16.14 · 추세 유지 (최근 4개 평균 19.75, 직전 4개 평균 20.25 대비 -2.5%)
+
+[3] tools/call query_data {"start": "2025-11-01", "end": "2025-11-30"} → 성공
+    2025-11-02=53, 2025-11-09=57, 2025-11-16=56, 2025-11-23=74(사건: ChatGPT 쇼핑 리서치 · 블랙프라이데이 주), 2025-11-30=84(급등)
+
+[4] tools/call get_statistics {"ma_window": 4} → 성공
+    전년 동기 대비 -37.9% · 최대 상승 2025-09-14 80.0% · 최고점 대비 -82.0%
+
+[5] tools/call list_conversations {"limit": 3} → 성공
+    3건: 작년 같은 시기와 비교하면 어때? | 이번 달 관심도는 어때? | 가장 관심이 높았던 때는 언제였어?
+
+[6] tools/call ask_assistant {"question": "최근 추세를 한 문장으로 알려 줘"} → 성공
+    도구 [] · 대화 Z4qwHcPZp7SsMtxEG83R
+    답: 최근 추세는 **유지**입니다: 마지막 날짜인 **2026-10-18 값이 18**이고, **최근 4개 평균 19.75**가 **직전 4개 평균 20.25 대비 -2.5%**로 거의 비슷한 수준입니다.
+
+결과: 5/5 성공
