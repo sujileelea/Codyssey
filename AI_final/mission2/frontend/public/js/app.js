@@ -1,6 +1,8 @@
 // 시작점 — 테마 · 탭 · 서버 깨우기(콜드스타트) 후 각 화면을 연다.
 import { api, apiBase } from "./api.js";
-import { $, store } from "./ui.js";
+import { refresh } from "./state.js";
+import { initSummary } from "./summary.js";
+import { $, store, toast } from "./ui.js";
 
 // ── 다크 모드 ──
 function currentTheme() {
@@ -80,11 +82,19 @@ export async function wakeServer() {
 }
 
 async function start() {
+  initSummary();
   try {
     const health = await wakeServer();
     if (health.dataset_name) $("dataset-name").textContent = health.dataset_name;
   } catch (e) {
     $("dataset-name").textContent = "서버에 연결하지 못했습니다 — 새로 고침해 주세요.";
+    return;
+  }
+  try {
+    await refresh();
+  } catch (e) {
+    toast(e.message, true);
+    $("summary-body").replaceChildren(document.createTextNode(e.message));
   }
 }
 
