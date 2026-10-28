@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 import main
 from app import deps
 from app.repositories import now
+from app.services.conversation_service import ConversationService
 from app.services.data_service import DataService
 
 _ids = itertools.count(1)
@@ -48,6 +49,30 @@ class MemoryDataRepository:
         self.docs.pop(item_id, None)
 
 
+class MemoryConversationRepository:
+    def __init__(self):
+        self.docs = {}
+
+    def list(self, limit):
+        rows = sorted(({"id": k, **v} for k, v in self.docs.items()), key=lambda r: r["updated_at"], reverse=True)
+        return [{k: r[k] for k in ("id", "title", "message_count", "preview", "created_at", "updated_at")} for r in rows[:limit]]
+
+    def get(self, conv_id):
+        return {"id": conv_id, **self.docs[conv_id]} if conv_id in self.docs else None
+
+    def create(self, fields):
+        conv_id = f"c{next(_ids):05d}"
+        self.docs[conv_id] = {**fields, "created_at": now(), "updated_at": now()}
+        return self.get(conv_id)
+
+    def update(self, conv_id, fields):
+        self.docs[conv_id].update(fields, updated_at=now())
+        return self.get(conv_id)
+
+    def delete(self, conv_id):
+        self.docs.pop(conv_id, None)
+
+
 def weekly(values, start="2025-01-05", memo=None):
     """일요일부터 1주 간격의 행 목록."""
     from datetime import date, timedelta
@@ -62,9 +87,16 @@ def data_repo():
 
 
 @pytest.fixture
-def client(data_repo):
+def conv_repo():
+    return MemoryConversationRepository()
+
+
+@pytest.fixture
+def client(data_repo, conv_repo):
     svc = DataService(data_repo, cache_seconds=0)
+    conv = ConversationService(conv_repo)
     main.app.dependency_overrides[deps.get_data_service] = lambda: svc
+    main.app.dependency_overrides[deps.get_conversation_service] = lambda: conv
     with TestClient(main.app) as c:
         yield c
     main.app.dependency_overrides.clear()

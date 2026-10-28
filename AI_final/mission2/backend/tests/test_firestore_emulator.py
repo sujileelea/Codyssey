@@ -41,3 +41,25 @@ def test_data_repository_roundtrip(db):
     assert svc.update(b["id"], DataIn(date="2026-01-18", value=5))["value"] == 5
     svc.delete(a["id"])
     assert [p["date"] for p in svc.all_points()] == ["2026-01-18"]
+
+
+def test_conversation_repository_roundtrip(db):
+    import time
+    from app.repositories import ConversationRepository
+    from app.schemas import Message
+    from app.services.conversation_service import ConversationService
+
+    svc = ConversationService(ConversationRepository(db))
+    a = svc.create([Message(role="user", content="첫 대화 질문")])
+    time.sleep(0.01)
+    b = svc.create([Message(role="user", content="두 번째")], title="제목")
+    time.sleep(0.01)
+    svc.append(a["id"], [{"role": "assistant", "content": "답", "tool_calls": [{"name": "get_data_summary", "arguments": {}}]}])
+    items = svc.list(10)["items"]
+    assert [i["id"] for i in items] == [a["id"], b["id"]]            # updated_at 내림차순
+    assert "messages" not in items[0] and items[0]["message_count"] == 2   # select() 로 messages 제외
+    full = svc.get(a["id"])
+    assert [m["role"] for m in full["messages"]] == ["user", "assistant"]
+    assert full["messages"][1]["tool_calls"][0]["name"] == "get_data_summary"
+    svc.delete(b["id"])
+    assert svc.list(10)["count"] == 1

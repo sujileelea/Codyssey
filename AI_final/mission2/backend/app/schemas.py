@@ -4,6 +4,7 @@
 서비스 코드는 '이미 검증된 값' 만 다룬다. extra="forbid" 로 오타 난 필드도 거른다.
 """
 from datetime import date as Date, datetime, timedelta
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -169,3 +170,48 @@ class Statistics(BaseModel):
     volatility: Volatility | None
     streak: Streak | None = Field(description="끝에서부터 같은 방향 연속 횟수")
     from_peak_pct: float | None = Field(description="최신 값의 최고점 대비(%)")
+
+
+# ── 대화 기록 ─────────────────────────────────────────────
+
+class ToolCall(BaseModel):
+    """GPT 가 호출한 도구 기록(보너스 Function Calling) — 화면에 '어떤 근거로 답했는지' 보여 준다."""
+    name: str
+    arguments: dict[str, Any] = {}
+
+
+class Message(_In):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=8000)
+    created_at: datetime | None = None
+    tool_calls: list[ToolCall] | None = None
+
+
+class ConversationIn(_In):
+    """POST /api/conversations — 브라우저에만 있던 대화를 제목과 함께 저장한다."""
+    model_config = ConfigDict(json_schema_extra={"examples": [{
+        "title": "최고점 질문",
+        "messages": [{"role": "user", "content": "가장 관심이 높았던 때는?"},
+                     {"role": "assistant", "content": "2026-06-07 주에 100으로 최고점이었습니다."}]}]})
+
+    title: str | None = Field(None, max_length=100, description="비우면 첫 질문 앞부분")
+    messages: list[Message] = Field(min_length=1, max_length=200)
+
+
+class ConversationItem(BaseModel):
+    """목록 항목 — messages 는 담지 않는다(불러오기는 GET /api/conversations/{id})."""
+    id: str
+    title: str
+    message_count: int
+    preview: str = Field("", description="마지막 메시지 앞부분")
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class ConversationList(BaseModel):
+    count: int
+    items: list[ConversationItem]
+
+
+class ConversationDetail(ConversationItem):
+    messages: list[Message]

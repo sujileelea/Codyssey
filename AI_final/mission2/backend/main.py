@@ -14,7 +14,7 @@ from fastapi.responses import RedirectResponse
 
 from app import errors, firebase
 from app.config import get_settings
-from app.routers import data
+from app.routers import conversations, data
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 for noisy in ("httpx", "httpx2", "openai"):
@@ -49,6 +49,7 @@ app.add_middleware(
 )
 errors.install(app)
 app.include_router(data.router)
+app.include_router(conversations.router)
 
 
 @app.get("/", include_in_schema=False)
