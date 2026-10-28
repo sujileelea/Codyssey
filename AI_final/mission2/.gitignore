@@ -1,0 +1,9 @@
+# Firebase 에뮬레이터 로그 · 캐시
+.firebase/
+*-debug.log
+# 서비스 계정 키(저장소 밖에 두지만 실수 방지)
+*firebase-adminsdk*.json
+service-account*.json
+backups/
+# Vercel CLI 연결 정보
+.vercel/
