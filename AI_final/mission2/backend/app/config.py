@@ -9,8 +9,9 @@ from functools import lru_cache
 
 from dotenv import load_dotenv
 
-# 로컬 .env 가 셸 환경 변수보다 우선한다(다른 프로젝트 키가 섞여 들어오지 않게)
-load_dotenv(override=True)
+# 로컬 .env 가 셸 환경 변수보다 우선한다(다른 프로젝트 키가 섞여 들어오지 않게). 테스트에서는 읽지 않는다.
+if os.getenv("APP_ENV") != "test":
+    load_dotenv(override=True)
 
 
 def _text(name: str, default: str = "") -> str:
