@@ -310,7 +310,7 @@ TEST_FIRESTORE_EMULATOR=127.0.0.1:8080 pytest tests/test_firestore_emulator.py  
 
 ## 배포
 
-**백엔드 — Render**: 대시보드 New → Blueprint → 저장소 `sujileelea/Codyssey` · 브랜치 `develop` · 경로 `AI_final/mission2/render.yaml`. 비밀 값 2개(`OPENAI_API_KEY` · `FIREBASE_SERVICE_ACCOUNT_JSON`)만 대시보드에서 입력하고 나머지는 Blueprint 에 값으로 들어 있다. 시작 명령 `uvicorn main:app --host 0.0.0.0 --port $PORT`, 상태 확인 `/health`. 서비스 키 JSON 은 한 줄로 넣는다 — `python3 -c "import json;print(json.dumps(json.load(open('<키 파일>'))))" | pbcopy`.
+**백엔드 — Render**: 대시보드 New → Blueprint → 저장소 `sujileelea/Codyssey` · 브랜치 `main` · 경로 `AI_final/mission2/render.yaml`. 배포 브랜치는 `main` 이라 `develop` 에서 개발한 변경은 `main` 에 병합될 때 자동으로 다시 배포된다. 비밀 값 2개(`OPENAI_API_KEY` · `FIREBASE_SERVICE_ACCOUNT_JSON`)만 대시보드에서 입력하고 나머지는 Blueprint 에 값으로 들어 있다. 시작 명령 `uvicorn main:app --host 0.0.0.0 --port $PORT`, 상태 확인 `/health`. 서비스 키 JSON 은 한 줄로 넣는다 — `python3 -c "import json;print(json.dumps(json.load(open('<키 파일>'))))" | pbcopy`.
 
 **프론트엔드 — Vercel**: 프로젝트 `codyssey-mydata-ai` 에 환경 변수 `API_BASE_URL` = 백엔드 주소를 넣고 `frontend/` 폴더에서 배포한다. `vercel.json` 이 빌드 명령(`node scripts/build-config.mjs`)과 출력 폴더(`public`)를 정한다.
 
