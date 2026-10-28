@@ -1,5 +1,6 @@
 // 시작점 — 테마 · 탭 · 서버 깨우기(콜드스타트) 후 각 화면을 연다.
 import { api, apiBase } from "./api.js";
+import { initChat, loadConversations } from "./chat.js";
 import { refresh } from "./state.js";
 import { initSummary } from "./summary.js";
 import { $, store, toast } from "./ui.js";
@@ -83,6 +84,7 @@ export async function wakeServer() {
 
 async function start() {
   initSummary();
+  initChat();
   try {
     const health = await wakeServer();
     if (health.dataset_name) $("dataset-name").textContent = health.dataset_name;
@@ -90,6 +92,7 @@ async function start() {
     $("dataset-name").textContent = "서버에 연결하지 못했습니다 — 새로 고침해 주세요.";
     return;
   }
+  loadConversations();
   try {
     await refresh();
   } catch (e) {
