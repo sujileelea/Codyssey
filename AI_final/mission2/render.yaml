@@ -1,9 +1,9 @@
 # Render Blueprint — 백엔드(FastAPI) 무료 웹 서비스 1개.
 # 대시보드 New → Blueprint → 저장소 sujileelea/Codyssey · 브랜치 develop · Blueprint 경로 AI_final/mission2/render.yaml
-# 비밀 값(sync: false)은 처음 만들 때 대시보드에서 직접 입력한다 — 저장소에는 이름만 있다.
+# 비밀 값(sync: false = OPENAI_API_KEY · FIREBASE_SERVICE_ACCOUNT_JSON)은 처음 만들 때 대시보드에서 직접 입력한다 — 저장소에는 이름만 있다.
 services:
   - type: web
-    name: my-data-assistant-api
+    name: codyssey-mydata-api
     runtime: python
     plan: free
     region: singapore
@@ -23,8 +23,11 @@ services:
         value: "1000"
       - key: FIREBASE_SERVICE_ACCOUNT_JSON
         sync: false
+      # CORS — 로컬 프론트 + Vercel 프로젝트 codyssey-mydata-ai 의 프로덕션 · 미리보기 주소만
       - key: ALLOWED_ORIGINS
-        sync: false
+        value: http://localhost:5500,http://127.0.0.1:5500
+      - key: ALLOWED_ORIGIN_REGEX
+        value: ^https://codyssey-mydata-ai(-[a-z0-9-]+)?\.vercel\.app$
       - key: CHAT_RATE_PER_MINUTE
         value: "10"
       - key: CHAT_DAILY_LIMIT
