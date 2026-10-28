@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Request
 from ..deps import get_chat_service
 from ..schemas import ChatIn, ChatOut, PromptPreview
 from ..services.chat_service import ChatService
+from ..services.tools import TOOL_SPECS
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -24,6 +25,11 @@ def chat(body: ChatIn, request: Request, svc: ChatService = Depends(get_chat_ser
 
 
 @router.get("/prompt", response_model=PromptPreview, summary="지금 주입될 시스템 프롬프트 미리 보기(GPT 호출 없음)")
-def prompt_preview(svc: ChatService = Depends(get_chat_service)):
-    summary, system_prompt = svc.context()
+def prompt_preview(use_tools: bool = True, svc: ChatService = Depends(get_chat_service)):
+    summary, system_prompt = svc.context(tools=use_tools)
     return {"summary": summary, "system_prompt": system_prompt}
+
+
+@router.get("/tools", summary="GPT 에 제공하는 도구 목록(Function Calling 스키마)")
+def tool_specs():
+    return TOOL_SPECS

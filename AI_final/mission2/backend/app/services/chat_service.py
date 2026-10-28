@@ -7,6 +7,7 @@ GPT 는 학습한 일반 지식만 알고 사용자의 데이터는 모른다. �
 시스템 프롬프트(대화의 전제 조건)에 글로 넣어 주면, 모델은 그 숫자를 근거로 답한다. 데이터를 고치면
 다음 질문부터 바뀐 요약이 들어간다.
 """
+import json
 import logging
 from datetime import date
 
@@ -14,10 +15,12 @@ from ..config import Settings
 from ..errors import AppError
 from .conversation_service import ConversationService
 from .data_service import DataService
+from .tools import TOOL_SPECS, ToolRunner, to_json
 
 log = logging.getLogger("app.chat")
 
 HISTORY_MESSAGES = 10    # 이전 대화는 최근 10개(5턴)만 함께 보낸다(토큰 절약)
+MAX_TOOL_ROUNDS = 3      # 도구 호출 왕복 상한(과금 보호)
 
 
 def fmt(x) -> str:
@@ -28,7 +31,7 @@ def fmt(x) -> str:
     return f"{int(x):,}" if x.is_integer() else f"{x:,.2f}".rstrip("0").rstrip(".")
 
 
-def build_system_prompt(summary: dict, settings: Settings, today: date | None = None) -> str:
+def build_system_prompt(summary: dict, settings: Settings, today: date | None = None, tools: bool = False) -> str:
     today = today or date.today()
     if not summary["count"]:
         data_block = "- 저장된 데이터가 없습니다. 데이터 관리 화면에서 (날짜, 값, 메모)를 추가하도록 안내하세요."
@@ -63,6 +66,8 @@ def build_system_prompt(summary: dict, settings: Settings, today: date | None = 
         "3. 데이터로 확인되는 사실(관찰)과 가능한 원인 추측(해석)을 구분한다.\n"
         "4. 3~6문장으로 간결하게 답한다. 필요하면 짧은 목록을 쓴다.\n"
         "5. '이번 달' · '최근' 은 데이터의 마지막 날짜 기준으로 해석하고, 그 기준을 답에 밝힌다."
+        + ("\n6. 요약에 없는 특정 기간의 값 · 연도별 비교 · 지난 대화 내용이 필요하면 도구를 호출해 확인한 뒤 답한다. "
+           "요약만으로 답할 수 있으면 도구를 부르지 않는다." if tools else "")
     )
 
 
@@ -71,6 +76,7 @@ class ChatService:
         self.data, self.conversations = data, conversations
         self.llm_factory = llm_factory          # 키가 없을 때 앱 시작이 아니라 채팅 요청에서 오류를 내도록 지연 생성
         self.settings, self.limiter = settings, limiter
+        self.tools = ToolRunner(data, conversations)
         self._llm = None
 
     @property
@@ -79,14 +85,14 @@ class ChatService:
             self._llm = self.llm_factory()
         return self._llm
 
-    def context(self) -> tuple[dict, str]:
+    def context(self, tools: bool = False) -> tuple[dict, str]:
         summary = self.data.summary()                                        # ① 요약 조회
-        return summary, build_system_prompt(summary, self.settings)           # ② 프롬프트에 삽입
+        return summary, build_system_prompt(summary, self.settings, tools=tools)   # ② 프롬프트에 삽입
 
     def chat(self, body, client: str) -> dict:
         llm = self.llm                                                        # 키가 없으면 여기서 503(호출 횟수는 세지 않음)
         self.limiter.check(client)
-        summary, system_prompt = self.context()
+        summary, system_prompt = self.context(tools=body.use_tools)
 
         if body.conversation_id:
             history = self.conversations.get(body.conversation_id).get("messages", [])
@@ -96,32 +102,61 @@ class ChatService:
         messages += [{"role": m["role"], "content": m["content"]} for m in history[-HISTORY_MESSAGES:]]
         messages.append({"role": "user", "content": body.message})
 
-        result = llm.complete(messages)                                       # ③ GPT 호출
+        result, used, usage = self._complete(llm, messages, body.use_tools)  # ③ GPT 호출(+ 도구)
         reply = result.content
         if not reply:
             reply = ("답변이 길어져 중간에 끊겼습니다. 질문을 더 좁혀 주세요." if result.finish_reason == "length"
                      else "답변을 만들지 못했습니다. 질문을 바꿔 다시 시도해 주세요.")
 
-        conv_id, saved = body.conversation_id, False
+        conv_id, saved, notice = body.conversation_id, False, None
         if body.save:                                                         # ④ 자동 저장
-            new = [{"role": "user", "content": body.message}, {"role": "assistant", "content": reply}]
+            new = [{"role": "user", "content": body.message}, {"role": "assistant", "content": reply, "tool_calls": used}]
             try:
                 if conv_id:
                     self.conversations.append(conv_id, new)
                 else:
                     conv_id = self.conversations.create([*history, *new])["id"]
                 saved = True
-            except AppError:
-                raise
-            except Exception:                                                 # 답은 돌려주고 저장 실패만 알린다
+            except AppError as e:                                             # 답은 돌려주고 저장 실패만 알린다
+                notice = e.message
+            except Exception:
                 log.exception("대화 저장 실패")
+                notice = "답변은 받았지만 대화를 저장하지 못했습니다."
 
         return {
             "conversation_id": conv_id,
             "saved": saved,
+            "notice": notice,
             "reply": reply,
             "model": llm.model,
-            "tool_calls": [],
+            "tool_calls": used,
             "context": {"period": summary["period"], "count": summary["count"], "trend": summary["trend"]},
-            "usage": result.usage or None,
+            "usage": usage or None,
         }
+
+    def _complete(self, llm, messages: list[dict], use_tools: bool):
+        """도구 호출이 끝날 때까지 GPT 와 주고받는다. 마지막 차례에는 도구를 빼서 답을 쓰게 한다."""
+        used, usage = [], {}
+        for round_no in range(MAX_TOOL_ROUNDS + 1):
+            tools = TOOL_SPECS if use_tools and round_no < MAX_TOOL_ROUNDS else None
+            result = llm.complete(messages, tools=tools)
+            for k, v in (result.usage or {}).items():
+                usage[k] = usage.get(k, 0) + v
+            if not result.tool_calls:
+                return result, used, usage
+            messages.append(result.message)
+            for call in result.tool_calls:
+                args = call.function.arguments
+                output = self.tools.run(call.function.name, args)
+                used.append({"name": call.function.name, "arguments": _args(args)})
+                log.info("도구 호출 %s %s", call.function.name, args)
+                messages.append({"role": "tool", "tool_call_id": call.id, "content": to_json(output)})
+        return result, used, usage
+
+
+def _args(raw) -> dict:
+    try:
+        value = json.loads(raw or "{}") if isinstance(raw, str) else raw
+        return value if isinstance(value, dict) else {}
+    except ValueError:
+        return {"raw": str(raw)[:200]}

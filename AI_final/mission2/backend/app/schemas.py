@@ -227,6 +227,7 @@ class ChatIn(_In):
     history: list[Message] = Field(default_factory=list, max_length=20,
                                    description="저장하지 않은 대화를 이어 갈 때 이전 메시지(conversation_id 가 있으면 무시)")
     save: bool = Field(True, description="질문과 답을 conversations 에 자동 저장")
+    use_tools: bool = Field(True, description="GPT 가 필요할 때 도구(기간별 조회 · 통계 · 지난 대화)를 호출하게 함")
 
 
 class ChatContext(BaseModel):
@@ -245,9 +246,10 @@ class Usage(BaseModel):
 class ChatOut(BaseModel):
     conversation_id: str | None
     saved: bool
+    notice: str | None = Field(None, description="저장 실패 등 답변과 별개인 안내")
     reply: str
     model: str
-    tool_calls: list[ToolCall] = []
+    tool_calls: list[ToolCall] = Field([], description="이번 답을 위해 GPT 가 호출한 도구와 인자")
     context: ChatContext
     usage: Usage | None = None
 
