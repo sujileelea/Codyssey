@@ -134,3 +134,11 @@ def test_llm_client_maps_openai_errors(monkeypatch):
     with pytest.raises(AppError) as e:
         LLMClient(get_settings())                                                            # 키 없음
     assert e.value.code == "AI_NOT_CONFIGURED"
+
+
+def test_rules_switch_with_tools():
+    s = analysis.summarize(weekly([1, 2, 3, 4], start="2026-01-04"))
+    with_tools = build_system_prompt(s, get_settings(), tools=True)
+    without = build_system_prompt(s, get_settings(), tools=False)
+    assert "먼저 도구로 조회" in with_tools and "범위를 넓혀 다시 조회" in with_tools
+    assert "'요약에 없는 정보'" in without and "도구" not in without
