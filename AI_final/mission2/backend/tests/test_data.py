@@ -63,3 +63,13 @@ def test_missing_or_bad_id(client):
     r = client.delete("/api/data/nope")
     assert r.status_code == 404 and r.json()["detail"]["code"] == "NOT_FOUND"
     assert client.delete("/api/data/bad%20id!").status_code == 422
+
+
+def test_validation_messages_are_korean(client):
+    r = client.post("/api/data", json={"date": "2026-02-30", "value": "많음", "memo": "x" * 201, "extra": 1})
+    msg = r.json()["detail"]["message"]
+    for text in ("날짜: 올바른 날짜(YYYY-MM-DD)가 아닙니다", "값: 숫자가 아닙니다", "메모: 200자 이하로 입력해 주세요", "extra: 알 수 없는 항목입니다"):
+        assert text in msg, msg
+    r = client.post("/api/data", json={"date": "1999-01-01", "value": 1})
+    assert "2000-01-01 부터 1년 뒤까지의 날짜만 받습니다" in r.json()["detail"]["message"]
+    assert "필수 항목입니다" in client.post("/api/data", json={"date": "2026-01-04"}).json()["detail"]["message"]
